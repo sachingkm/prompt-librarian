@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Prompt Librarian — Design Notes</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0f1216;
+    --panel: #181c22;
+    --panel-alt: #1f242b;
+    --border: #2a3038;
+    --text: #e6edf3;
+    --dim: #a3acb9;
+    --muted: #6f7886;
+    --accent: #3b82f6;
+    --ok: #5cc97a;
+    --warn: #e0a64a;
+    --danger: #ff6b6b;
+    --mono: "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "Inter", "Helvetica Neue", sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); font-family: var(--sans); font-size: 14.5px; line-height: 1.6; -webkit-font-smoothing: antialiased; }
+  .wrap { max-width: 880px; margin: 0 auto; padding: 56px 28px 120px; }
+  h1 { font-size: 30px; font-weight: 600; margin: 0 0 6px; letter-spacing: -0.3px; }
+  h2 { font-size: 20px; font-weight: 600; margin: 44px 0 10px; padding-top: 22px; border-top: 1px solid var(--border); letter-spacing: -0.1px; }
+  h3 { font-size: 15px; font-weight: 600; margin: 22px 0 6px; color: var(--text); }
+  p { margin: 0 0 12px; color: var(--text); }
+  .lead { color: var(--dim); font-size: 16px; margin-bottom: 28px; }
+  .meta { font-family: var(--mono); font-size: 12px; color: var(--muted); margin-bottom: 32px; }
+  ul, ol { margin: 0 0 14px; padding-left: 22px; }
+  li { margin-bottom: 5px; }
+  code { font-family: var(--mono); font-size: 13px; padding: 1px 5px; background: var(--panel); border: 1px solid var(--border); border-radius: 3px; color: var(--text); }
+  pre { background: var(--panel); border: 1px solid var(--border); border-radius: 4px; padding: 14px; overflow-x: auto; font-family: var(--mono); font-size: 12.5px; line-height: 1.55; color: var(--text); margin: 12px 0 18px; }
+  .callout { background: var(--panel); border: 1px solid var(--border); border-left: 3px solid var(--accent); padding: 12px 16px; border-radius: 4px; margin: 14px 0 22px; font-size: 14px; color: var(--dim); }
+  .callout.warn { border-left-color: var(--warn); }
+  .callout.danger { border-left-color: var(--danger); }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: 4px; padding: 14px 16px; }
+  .card h4 { margin: 0 0 6px; font-size: 13px; }
+  .card p { font-size: 13px; color: var(--dim); margin: 0; }
+  table { border-collapse: collapse; width: 100%; margin: 10px 0 18px; font-size: 13.5px; }
+  th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { font-family: var(--mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--muted); font-weight: 600; }
+  td code { font-size: 12px; }
+  .pill { display: inline-block; padding: 1px 7px; font-family: var(--mono); font-size: 11px; border-radius: 3px; background: var(--panel-alt); border: 1px solid var(--border); color: var(--dim); margin-right: 4px; }
+  .pill.ok { color: var(--ok); border-color: rgba(92,201,122,0.4); }
+  .pill.warn { color: var(--warn); border-color: rgba(224,166,74,0.4); }
+  .pill.danger { color: var(--danger); border-color: rgba(255,107,107,0.4); }
+  .toc { background: var(--panel); border: 1px solid var(--border); border-radius: 4px; padding: 14px 18px; margin-bottom: 32px; font-size: 13.5px; }
+  .toc ol { margin: 0; padding-left: 20px; }
+  .toc a { color: var(--dim); text-decoration: none; }
+  .toc a:hover { color: var(--accent); }
+  hr { border: none; border-top: 1px solid var(--border); margin: 32px 0; }
+  kbd { font-family: var(--mono); font-size: 11px; padding: 1px 5px; background: var(--panel-alt); border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 3px; color: var(--dim); }
+  .rule { background: var(--panel); border: 1px solid var(--border); border-radius: 4px; padding: 14px 18px; margin: 8px 0; }
+  .rule strong { color: var(--accent); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>Prompt Librarian — Design Notes</h1>
+<p class="lead">Local-first desktop app for capturing, classifying, and reusing prompts as Markdown files. Phase 1 = Electron + React + TypeScript. Public, downloadable from GitHub. No cloud, no login, no plugins.</p>
+<div class="meta">v1 · companion to <code>Prompt Librarian.html</code> · for engineering handoff</div>
+
+<div class="toc">
+  <ol>
+    <li><a href="#direction">Product direction</a></li>
+    <li><a href="#rules">Locked rules</a></li>
+    <li><a href="#flow">User flow</a></li>
+    <li><a href="#ia">Information architecture</a></li>
+    <li><a href="#screens">Key screens</a></li>
+    <li><a href="#interactions">Interaction details</a></li>
+    <li><a href="#states">States &amp; edge cases</a></li>
+    <li><a href="#folder-choice">Folder choice, collisions, confidence</a></li>
+    <li><a href="#engineering">Engineering handoff (Electron + React + TS)</a></li>
+    <li><a href="#shortcuts">Keyboard shortcuts</a></li>
+  </ol>
+</div>
+
+<h2 id="direction">1. Product direction</h2>
+<p><strong>Quiet, serious, utility-first.</strong> Looks and behaves like a text editor or IDE, not a marketing page. Three-pane shell — folder tree on the left, list/editor in the center, metadata on the right — with a status bar pinned to the bottom and a minimal title bar on top. Dense, monospace-accented, keyboard-first.</p>
+<p>Default to dark; light theme available. Single curated accent color (blue, amber, violet, or green). No gradients, no marketing iconography, no emoji.</p>
+<p>The app is a thin layer over a folder of <code>.md</code> files. The user can leave at any time — Obsidian, VS Code, plain Finder — and the data is intact. That promise is the product.</p>
+
+<h2 id="rules">2. Locked rules</h2>
+<div class="rule"><strong>Rule 1.</strong> Local Markdown files are the source of truth. The app reads from disk, watches for changes, and writes back. There is no database. Any cache (search index, classifier output) can be rebuilt from the files.</div>
+<div class="rule"><strong>Rule 2.</strong> The user must explicitly choose the writable root folder. The app never picks one for them, never assumes a personal path (no Google Drive, no <code>C:\Users\&lt;name&gt;</code> defaults), and never writes outside that folder.</div>
+<div class="callout warn">
+  <strong>Hard constraints.</strong> Never organize prompts by LLM vendor. Never create <code>_gpt</code> / <code>_cld</code> / <code>_ag</code> file variants. Model-specific behavior lives inside a <code>## Compatibility Notes</code> section in the same prompt file. Folder placement is decided by <em>function → domain → project</em>, in that order.
+</div>
+
+<h2 id="flow">3. User flow</h2>
+<h3>3.1 First-run (one time per machine)</h3>
+<ol>
+  <li>App launches with no library. Welcome card explains: Markdown on disk, you choose the folder, no cloud.</li>
+  <li>User picks <em>Create new library</em> or <em>Use existing library</em>.</li>
+  <li>User selects a folder via OS file picker. App validates write permission.</li>
+  <li>If <em>Create new</em>: app offers to initialize the default folder structure. Checkbox; can be turned off.</li>
+  <li>Confirmation screen lists exactly what the app will read, write, watch, and never touch. User clicks <em>Open library</em>.</li>
+</ol>
+
+<h3>3.2 Steady-state daily flow</h3>
+<ol>
+  <li><kbd>Ctrl+N</kbd> from anywhere → intake. Paste raw prompt → <em>Classify</em> → review classifier output → <em>Save</em>.</li>
+  <li>Or: from the system tray, hit the global hotkey <kbd>Ctrl+Shift+N</kbd> → tray quick-capture window pops up; paste; send to library; intake opens with text pre-filled.</li>
+  <li><kbd>Ctrl+K</kbd> command palette for navigation, search, and commands.</li>
+  <li>Browse the tree, open a file, edit, <kbd>Ctrl+S</kbd> to save. File watcher keeps in sync if you edit it externally.</li>
+  <li>Hygiene tab surfaces under-tagged or untriaged captures.</li>
+</ol>
+
+<h2 id="ia">4. Information architecture</h2>
+<h3>4.1 File on disk</h3>
+<pre>---
+title: Transcript Cleanup — Remove Fillers
+category: Core Transforms
+subcategory: Transcript Cleanup
+function: transform
+domain: null
+project: null
+tags:
+  - transcript
+  - cleanup
+reuse: high
+scope: reusable
+created_at: 2026-01-06T14:00:00Z
+updated_at: 2026-05-02T10:11:00Z
+---
+
+# Transcript Cleanup — Remove Fillers
+
+## Purpose
+…
+
+## Inputs Required
+…
+
+## Output
+…
+
+## Prompt
+…
+
+## Notes
+…
+
+## Compatibility Notes
+Optional. Notes on behavior with different LLMs.
+Never used for folder placement.
+</pre>
+
+<h3>4.2 Default folder structure</h3>
+<pre>&lt;library-root&gt;/
+  00-Index/
+  01-Core Transforms/
+  02-Interview/
+  03-Job Search/
+  04-Product Specs/
+  05-Research/
+  06-Project Prompts/
+    Career Buddy/
+    OpenClaw/
+  90-Examples/
+  99-Archive/</pre>
+<p>Numbered prefixes give stable display order without depending on the OS sort. Users can rename, delete, or add folders — the app re-renders from disk.</p>
+
+<h3>4.3 Classification dimensions</h3>
+<table>
+  <thead><tr><th>Dimension</th><th>Values</th><th>Used for</th></tr></thead>
+  <tbody>
+    <tr><td>function</td><td>transform · summarize · extract · classify · rewrite · compare · generate · critique · plan</td><td>Folder placement (1st priority)</td></tr>
+    <tr><td>domain</td><td>interview · job search · product specs · research · project prompts</td><td>Folder placement (2nd)</td></tr>
+    <tr><td>project</td><td>free string, e.g. <em>Career Buddy</em></td><td>Folder placement (3rd)</td></tr>
+    <tr><td>scope</td><td>reusable · project reusable · one-off</td><td>Filtering, hygiene</td></tr>
+    <tr><td>reuse</td><td>high · medium · low</td><td>Filtering, dashboards</td></tr>
+    <tr><td>tags</td><td>2–5 short lowercase strings</td><td>Search, filtering</td></tr>
+  </tbody>
+</table>
+
+<h2 id="screens">5. Key screens</h2>
+<div class="grid2">
+  <div class="card"><h4>1. First-run setup</h4><p>4-step modal. Welcome → choose new/existing → pick folder → confirm. Always shows what the app will read/write/never touch.</p></div>
+  <div class="card"><h4>2. Library browser</h4><p>Three-pane: folder tree, table of prompts (Title, Folder, Function, Reuse, Used, Updated), metadata side panel.</p></div>
+  <div class="card"><h4>3. Intake / classify</h4><p>Two-step. Paste box → Classify → review screen with editable left (body) and right (metadata) plus rationale and confidence.</p></div>
+  <div class="card"><h4>4. Detail / editor</h4><p>Editor / Preview / Raw Markdown tabs. Same metadata panel on the right. Save with <kbd>Ctrl+S</kbd>; close with Esc.</p></div>
+  <div class="card"><h4>5. Search / command palette</h4><p>Global <kbd>Ctrl+K</kbd> palette: prompts and commands in one list, keyboard navigable.</p></div>
+  <div class="card"><h4>6. Folder management</h4><p>Modal lists every folder, prompt count, inline rename, delete (with confirmation that lists affected files).</p></div>
+  <div class="card"><h4>7. Archive / hygiene</h4><p>Hygiene flags prompts missing metadata or filed poorly. Archive view shows everything under <code>99-Archive/</code>; archived files are still searchable but de-prioritized.</p></div>
+  <div class="card"><h4>+ Tray quick-capture</h4><p>Tiny window, single textarea. Send to library; main app opens at intake review.</p></div>
+</div>
+
+<h2 id="interactions">6. Interaction details</h2>
+<h3>Classify</h3>
+<ol>
+  <li>User pastes text and presses <em>Classify</em> (or <kbd>Ctrl+Enter</kbd>).</li>
+  <li>App calls the classifier with a strict JSON-output system prompt. Returned fields: <code>title</code>, <code>function</code>, <code>category</code>, <code>subcategory</code>, <code>domain</code>, <code>project</code>, <code>tags</code>, <code>reuse</code>, <code>scope</code>, <code>folder</code>, <code>filename</code>, <code>confidence</code>, <code>rationale</code>.</li>
+  <li>If the classifier is unavailable or returns invalid JSON, the app falls back to a local heuristic and stamps the result with <span class="pill warn">heuristic fallback</span>.</li>
+  <li>Confidence is shown as a small bar with a percentage. ≥75% green, ≥50% amber, &lt;50% red.</li>
+  <li>The user can edit every field. <em>Re-classify</em> re-runs with the same body. <em>Save</em> writes only after confirmation.</li>
+</ol>
+
+<h3>Save</h3>
+<ol>
+  <li>Compose the file: serialize frontmatter + body. Validate filename ends in <code>.md</code> and matches <code>^[a-z0-9._-]+$</code> (warn if not).</li>
+  <li>Ensure the target folder exists; create it (and any missing intermediates) under the library root only.</li>
+  <li><strong>Atomic write:</strong> write to <code>&lt;target&gt;.tmp</code>, fsync, rename. Never overwrite via direct write.</li>
+  <li>If a file at the target path already exists with different content → open the conflict modal (see §8).</li>
+  <li>On success, update the in-memory index, post a toast, and reset the intake.</li>
+</ol>
+
+<h3>Edit</h3>
+<ul>
+  <li>Editor / Preview / Raw Markdown tabs share the same model. Raw view shows the exact bytes that will be written.</li>
+  <li>Auto-save on blur is <strong>off</strong> by default. Save is explicit. The dirty state shows in the title bar (<code>● filename.md</code>).</li>
+  <li>External edits (file watcher detects mtime change) prompt: keep mine / use disk / open diff. Never silently overwrite either side.</li>
+</ul>
+
+<h3>Move</h3>
+<ul>
+  <li>Move modal shows the folder tree. Selecting a destination triggers an atomic rename on disk. Updates frontmatter <code>updated_at</code>. The app is the only thing that needs to remember the new path; other notes that referenced it by filename are stable because the slug doesn't change.</li>
+</ul>
+
+<h3>Archive</h3>
+<ul>
+  <li>"Archive" = move file into <code>99-Archive/</code>, preserving subfolder structure (<code>99-Archive/03-Job Search/Resume/old.md</code>).</li>
+  <li>Archived files appear in search but with reduced rank; they don't appear in dashboards.</li>
+  <li>"Unarchive" is a Move back to the original folder, available from the metadata panel.</li>
+</ul>
+
+<h2 id="states">7. States &amp; edge cases</h2>
+<table>
+  <thead><tr><th>State</th><th>UX</th></tr></thead>
+  <tbody>
+    <tr><td>Empty library (post first-run)</td><td>Library Home shows a single CTA card explaining intake. Folder tree shows the default structure. <em>Nothing</em> auto-populates.</td></tr>
+    <tr><td>Empty folder</td><td>Inline message: "Nothing in this folder yet. Drop a prompt into <kbd>Ctrl+N</kbd> intake or open the folder in your file manager — Markdown files added there will show up automatically."</td></tr>
+    <tr><td>No search results</td><td>"No results." Plus a button to clear filters and a hint to try fewer tokens.</td></tr>
+    <tr><td>Classifier offline / invalid JSON</td><td>Heuristic fallback runs immediately; UI tags result as <span class="pill warn">heuristic fallback</span>. User can still edit + save.</td></tr>
+    <tr><td>Classifier disagrees with user</td><td>User overrides freely. App stores the user's final values; classifier rationale stays visible read-only on detail panel for audit.</td></tr>
+    <tr><td>Filename collision on save</td><td>Conflict modal (§8). No silent overwrite, ever.</td></tr>
+    <tr><td>Folder not found at boot</td><td>App refuses to start the main view. Surfaces "Library folder is missing or unreadable" with options: re-pick / open file manager.</td></tr>
+    <tr><td>Permission denied on write</td><td>Toast: "Couldn't write &lt;path&gt;: permission denied." Show OS-specific guidance (macOS Full Disk Access, Windows folder ACL) and a button to re-pick the root.</td></tr>
+    <tr><td>External edit while file open</td><td>Banner above the editor: "This file changed on disk. [Reload] [Keep mine] [Diff]"</td></tr>
+    <tr><td>External delete while file open</td><td>Editor stays in memory; banner says "File no longer on disk. [Recreate] [Discard]"</td></tr>
+    <tr><td>Frontmatter corrupted (existing file)</td><td>App still indexes it and shows a <span class="pill warn">malformed frontmatter</span> badge. Fields the parser couldn't read fall back to defaults; raw view always works.</td></tr>
+    <tr><td>Untriaged capture</td><td>Pill <span class="pill warn">needs triage</span> on row. Hygiene tab lists them and offers <em>Reclassify</em>.</td></tr>
+    <tr><td>User changes root folder</td><td>Old root is no longer read. Existing files are not moved. New root is indexed from scratch.</td></tr>
+  </tbody>
+</table>
+
+<h2 id="folder-choice">8. Folder choice, collisions, confidence</h2>
+<h3>Folder choice (first-run + later)</h3>
+<ul>
+  <li>Always go through the OS file picker. Never type-only.</li>
+  <li>Validate the folder exists, is readable, and is writable before accepting it.</li>
+  <li>Refuse system folders (e.g., root of <code>/</code>, <code>%APPDATA%</code>, the app's own install dir).</li>
+  <li>Persist the choice in the app config file (<code>~/.config/prompt-librarian/config.json</code> or platform equivalent), not in the library itself.</li>
+  <li>Settings → Library → Change root re-runs the same flow.</li>
+</ul>
+
+<h3>Collision handling</h3>
+<p>When a save would write over a different file at the same path, show a modal with three options:</p>
+<ul>
+  <li><strong>Save as new file</strong> — auto-suggest <code>name-1.md</code>; user can edit. Default action.</li>
+  <li><strong>Replace existing</strong> — destructive, danger button, requires explicit click. Existing version is moved into <code>.trash/</code> inside the library root, not deleted, for 7 days.</li>
+  <li><strong>Open both side-by-side</strong> — opens a diff view so the user can hand-merge into a single file.</li>
+</ul>
+<div class="callout danger">Never silently overwrite. Never auto-bump filenames without telling the user. The conflict modal is mandatory.</div>
+
+<h3>Confidence display</h3>
+<ul>
+  <li>One bar, one number. Color-coded green/amber/red.</li>
+  <li>Always paired with a <em>rationale</em> sentence. The bar without the rationale is meaningless.</li>
+  <li>Below 50%, the Save button stays enabled but the modal copy nudges toward editing first.</li>
+  <li>The classifier never blocks a save. The user is the final word.</li>
+</ul>
+
+<h2 id="engineering">9. Engineering handoff (Electron + React + TypeScript)</h2>
+<h3>Stack</h3>
+<table>
+  <tr><th>Layer</th><th>Choice</th><th>Why</th></tr>
+  <tr><td>Shell</td><td>Electron 30+</td><td>Cross-platform local desktop, OS file picker, file watcher, system tray, global hotkeys.</td></tr>
+  <tr><td>Renderer</td><td>React 18 + TypeScript</td><td>Standard, well-supported. Vite for dev.</td></tr>
+  <tr><td>State</td><td>Zustand or Redux Toolkit</td><td>Simple. Don't over-engineer. State is mostly derived from the file index.</td></tr>
+  <tr><td>File watcher</td><td><code>chokidar</code></td><td>Cross-platform mtime + content events.</td></tr>
+  <tr><td>Markdown parsing</td><td><code>gray-matter</code> + <code>remark</code></td><td>Frontmatter + AST when needed.</td></tr>
+  <tr><td>Search</td><td><code>minisearch</code> or <code>flexsearch</code> in renderer</td><td>In-memory index, rebuilt on boot from files. Cache to <code>.cache/index.json</code> for faster cold starts; checksum-validated.</td></tr>
+  <tr><td>Editor</td><td>CodeMirror 6 with Markdown mode</td><td>Light, scriptable, excellent keyboard support.</td></tr>
+  <tr><td>Hotkeys</td><td><code>mousetrap</code> in renderer; <code>globalShortcut</code> for tray</td><td>Renderer for in-app, main process for tray quick-capture.</td></tr>
+</table>
+
+<h3>Process boundaries</h3>
+<ul>
+  <li><strong>Main process</strong> owns: filesystem, file watcher, OS dialogs, global shortcuts, system tray window, app config. Exposes a typed IPC API.</li>
+  <li><strong>Renderer</strong> owns: UI, search index, editor state, classifier client. Never touches <code>fs</code> directly.</li>
+  <li>All file operations go through a small <code>fs/</code> module in main with a <strong>root guard</strong>: every path is resolved and verified to be inside the library root before any read/write/rename. Out-of-root paths throw.</li>
+</ul>
+
+<h3>Key invariants for the build</h3>
+<ol>
+  <li><strong>Root guard.</strong> Every <code>fs</code> call validates the resolved absolute path is a descendant of the library root. No exceptions.</li>
+  <li><strong>Atomic writes.</strong> Write to a sibling temp file, fsync, then rename. On rename failure, leave the original intact.</li>
+  <li><strong>Soft delete.</strong> Replace = move existing into <code>&lt;root&gt;/.trash/</code> with timestamp suffix; cleanup older than 7 days on next boot.</li>
+  <li><strong>Watcher debounce.</strong> 200ms. Multiple events on the same path collapse.</li>
+  <li><strong>Idempotent reindex.</strong> Boot path: read all <code>.md</code>, build index. Any cache must be rebuildable without user data loss.</li>
+  <li><strong>No vendor coupling.</strong> The classifier is a pluggable interface. Default implementation calls Anthropic; a fallback heuristic runs entirely locally. Folder placement is never derived from which model produced a result.</li>
+</ol>
+
+<h3>Data layer (TS types)</h3>
+<pre>type FunctionTag =
+  | "transform" | "summarize" | "extract" | "classify"
+  | "rewrite"   | "compare"   | "generate" | "critique" | "plan";
+
+type Domain =
+  | "interview" | "job search" | "product specs" | "research" | "project prompts";
+
+type Reuse = "high" | "medium" | "low";
+type Scope = "reusable" | "project reusable" | "one-off";
+
+interface Prompt {
+  /* Identity */
+  absPath: string;          // <root>/<folder>/<filename>
+  folder: string;           // relative to root, forward slashes
+  filename: string;         // <slug>.md
+  /* Frontmatter (all optional in storage; required-ish in UI) */
+  title: string;
+  category?: string;
+  subcategory?: string;
+  function?: FunctionTag;
+  domain?: Domain | null;
+  project?: string | null;
+  tags: string[];
+  reuse?: Reuse;
+  scope?: Scope;
+  created_at?: string;      // ISO
+  updated_at?: string;      // ISO
+  /* Body sections (parsed from Markdown headings) */
+  purpose?: string;
+  inputs?: string;
+  output?: string;
+  body: string;             // the actual prompt text (## Prompt section)
+  notes?: string;
+  compatibility?: string;
+}
+
+interface Classification {
+  title: string;
+  function: FunctionTag;
+  category: string;
+  subcategory?: string;
+  domain?: Domain | null;
+  project?: string | null;
+  tags: string[];
+  reuse: Reuse;
+  scope: Scope;
+  folder: string;
+  filename: string;
+  confidence: number;       // 0..1
+  rationale: string;
+}
+
+interface AppConfig {
+  libraryRoot: string;
+  watchEnabled: boolean;
+  conflictPolicy: "ask" | "rename" | "overwrite";
+  defaults: { reuse: Reuse; scope: Scope; filenameFormat: string };
+  classifier: { provider: "anthropic" | "heuristic"; apiKeyRef?: string };
+  hotkeys: Record&lt;string, string&gt;;
+}</pre>
+
+<h3>IPC surface (main ⇄ renderer)</h3>
+<pre>// main exposes — all path args validated against libraryRoot
+ipc.handle("library/pick-root", () =&gt; OpenDialogResult)
+ipc.handle("library/init-default-structure", (root) =&gt; void)
+ipc.handle("library/list", () =&gt; PromptIndexEntry[])
+ipc.handle("library/read", (relPath) =&gt; string)
+ipc.handle("library/write", (relPath, contents, opts) =&gt; WriteResult)
+ipc.handle("library/move", (fromRel, toRel) =&gt; void)
+ipc.handle("library/trash", (relPath) =&gt; void)
+ipc.handle("library/exists", (relPath) =&gt; boolean)
+ipc.on   ("library/changed", (relPath, event) =&gt; void)   // file watcher
+ipc.handle("config/get", () =&gt; AppConfig)
+ipc.handle("config/set", (patch) =&gt; AppConfig)
+ipc.handle("classify", (text) =&gt; Classification)         // tries provider, falls back to heuristic</pre>
+
+<h3>Phase 2 portability</h3>
+<p>If the app later moves to a hosted web app, the model stays:</p>
+<ul>
+  <li>Replace the local <code>fs/</code> module with a server-backed file API. Frontmatter + folder structure are unchanged.</li>
+  <li>The classifier API is already pluggable.</li>
+  <li>The user still picks a writable root — it just happens to be a remote bucket prefix.</li>
+  <li>No screen, no field, and no folder needs to change.</li>
+</ul>
+
+<h2 id="shortcuts">10. Keyboard shortcuts</h2>
+<table>
+  <tr><th>Shortcut</th><th>Action</th></tr>
+  <tr><td><kbd>Ctrl+K</kbd></td><td>Command palette / search</td></tr>
+  <tr><td><kbd>Ctrl+N</kbd></td><td>New prompt (paste &amp; classify)</td></tr>
+  <tr><td><kbd>Ctrl+Shift+N</kbd></td><td>Quick capture (tray window) — global hotkey</td></tr>
+  <tr><td><kbd>Ctrl+S</kbd></td><td>Save current prompt</td></tr>
+  <tr><td><kbd>Ctrl+,</kbd></td><td>Settings</td></tr>
+  <tr><td><kbd>Ctrl+/</kbd></td><td>Show shortcut sheet</td></tr>
+  <tr><td><kbd>Esc</kbd></td><td>Close overlay or editor</td></tr>
+  <tr><td><kbd>↑↓</kbd> / <kbd>Enter</kbd></td><td>Navigate / open selection</td></tr>
+  <tr><td><kbd>Ctrl+D</kbd></td><td>Duplicate prompt</td></tr>
+  <tr><td><kbd>Ctrl+E</kbd></td><td>Edit selection metadata</td></tr>
+  <tr><td><kbd>Ctrl+Shift+A</kbd></td><td>Archive selected prompt</td></tr>
+  <tr><td><kbd>Ctrl+Shift+C</kbd></td><td>Copy prompt body</td></tr>
+  <tr><td><kbd>Ctrl+Shift+M</kbd></td><td>Move prompt to another folder</td></tr>
+</table>
+
+<hr>
+<p style="color: var(--muted); font-size: 12.5px;">End of design notes. The interactive prototype is in <code>Prompt Librarian.html</code> beside this file. Toggle Tweaks (top-right of the prototype) to switch between the seeded library, the empty library, and the first-run flow.</p>
+
+</div>
+</body>
+</html>

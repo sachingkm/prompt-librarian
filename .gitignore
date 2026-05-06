@@ -1,0 +1,35 @@
+# Node / frontend
+node_modules/
+dist/
+build/
+.vite/
+
+# Electron / packaging
+out/
+release/
+*.asar
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Local env / settings
+.env
+.env.*
+
+# OS / editor
+.DS_Store
+Thumbs.db
+Desktop.ini
+.vscode/
+.idea/
+
+# Python
+__pycache__/
+*.pyc
+
+# Test / coverage
+coverage/
+.nyc_output/
