@@ -26,6 +26,9 @@ Desktop.ini
 .vscode/
 .idea/
 
+# Claude Code workspace (worktrees, agent state)
+.claude/
+
 # Python
 __pycache__/
 *.pyc
