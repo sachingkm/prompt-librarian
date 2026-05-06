@@ -1,4 +1,4 @@
-# Prompt Cataloging
+# Prompt Librarian
 
 Local-first prompt library app and design workspace.
 
