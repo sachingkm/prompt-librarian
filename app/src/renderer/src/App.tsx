@@ -1,28 +1,20 @@
+import Phase1TestPanel from './Phase1TestPanel'
+
 function App(): JSX.Element {
   return (
     <div className="shell">
       <header className="title-bar">
         <span className="brand">Prompt Librarian</span>
-        <span className="phase-tag">Phase 0 - scaffolding</span>
+        <span className="phase-tag">Phase 1 - filesystem IPC test surface</span>
       </header>
 
-      <main className="main">
-        <div className="empty-state">
-          <h1>Prompt Librarian</h1>
-          <p className="lead">
-            Local-first desktop app for capturing, classifying, and reusing prompts as Markdown
-            files.
-          </p>
-          <p className="dim">
-            The shell is up. Filesystem access, onboarding, classification, and library browsing
-            are still to come in later phases.
-          </p>
-        </div>
+      <main className="main main-phase1">
+        <Phase1TestPanel />
       </main>
 
       <footer className="status-bar">
         <span>electron-vite + react + typescript</span>
-        <span className="dim">no library selected yet</span>
+        <span className="dim">phase 1 - dev test surface only</span>
       </footer>
     </div>
   )
