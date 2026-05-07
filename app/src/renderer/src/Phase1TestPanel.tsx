@@ -122,7 +122,9 @@ export default function Phase1TestPanel(): JSX.Element {
     setBusy(true)
     try {
       const result: MoveResult = await window.api.archivePrompt(relPath)
-      append(result.ok ? 'ok' : 'err', `archivePrompt(${relPath}): ${formatJson(result)}`)
+      const kind: LogEntry['kind'] = result.ok ? (result.autoRenamed ? 'warn' : 'ok') : 'err'
+      const note = result.autoRenamed ? ' [auto-renamed on archive collision]' : ''
+      append(kind, `archivePrompt(${relPath})${note}: ${formatJson(result)}`)
     } catch (err) {
       append('err', `archivePrompt failed: ${(err as Error).message}`)
     } finally {
@@ -134,7 +136,8 @@ export default function Phase1TestPanel(): JSX.Element {
     setBusy(true)
     try {
       const result = await window.api.movePrompt(relPath, newFolder)
-      append(result.ok ? 'ok' : 'err', `movePrompt(${relPath} -> ${newFolder}): ${formatJson(result)}`)
+      const kind: LogEntry['kind'] = result.ok ? 'ok' : result.collision ? 'warn' : 'err'
+      append(kind, `movePrompt(${relPath} -> ${newFolder}): ${formatJson(result)}`)
     } catch (err) {
       append('err', `movePrompt failed: ${(err as Error).message}`)
     } finally {
@@ -147,6 +150,14 @@ export default function Phase1TestPanel(): JSX.Element {
       <header className="phase1-head">
         <strong>Phase 1 test surface</strong>
         <span className="dim"> - exercises filesystem IPC. Not the final UI.</span>
+        <div className="phase1-hint">
+          Collision tests:
+          <ul>
+            <li>Save (rename copy) twice with the same filename - second call must report collision (not overwrite).</li>
+            <li>Save the same filename in two different folders, then move one onto the other - must report collision.</li>
+            <li>Save the same filename twice and archive each - second archive must auto-rename with a timestamp suffix; the first archived file stays untouched.</li>
+          </ul>
+        </div>
       </header>
 
       <section className="phase1-row">

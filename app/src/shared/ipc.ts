@@ -68,6 +68,8 @@ export interface InitResult {
 export interface MoveResult {
   ok: boolean
   newRelPath?: string
+  collision?: boolean
+  autoRenamed?: boolean
   error?: string
 }
 

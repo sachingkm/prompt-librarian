@@ -156,18 +156,22 @@ export async function savePrompt(
 
   await fs.mkdir(folderAbs, { recursive: true })
 
+  // Collision: only 'overwrite' is allowed to clobber an existing file.
+  // 'fail' and 'rename' both refuse to overwrite. For 'rename' this means the
+  // caller-supplied newFilename must itself be unused, otherwise we surface
+  // the collision instead of silently writing over it.
   const exists = await fs.stat(fileAbs).catch(() => null)
-  if (exists && exists.isFile()) {
-    if (strategy === 'fail') {
-      return {
-        ok: false,
-        collision: true,
-        path: fileAbs,
-        relPath: toRelPosix(root, fileAbs),
-        error: 'File already exists'
-      }
+  if (exists && exists.isFile() && strategy !== 'overwrite') {
+    return {
+      ok: false,
+      collision: true,
+      path: fileAbs,
+      relPath: toRelPosix(root, fileAbs),
+      error:
+        strategy === 'rename'
+          ? `Renamed target already exists: ${filename}`
+          : 'File already exists'
     }
-    // 'overwrite' or 'rename' (already remapped above) both proceed below
   }
 
   try {
@@ -183,7 +187,10 @@ export async function savePrompt(
   }
 }
 
-async function moveRelative(currentRelPath: string, newFolderRel: string): Promise<MoveResult> {
+export async function movePrompt(
+  currentRelPath: string,
+  newFolder: string
+): Promise<MoveResult> {
   const root = await requireRoot()
   let oldAbs: string
   try {
@@ -203,7 +210,7 @@ async function moveRelative(currentRelPath: string, newFolderRel: string): Promi
     return { ok: false, error: (err as Error).message }
   }
 
-  const cleanedFolder = newFolderRel.replace(/^[/\\]+|[/\\]+$/g, '')
+  const cleanedFolder = newFolder.replace(/^[/\\]+|[/\\]+$/g, '')
   let newFolderAbs: string
   let newAbs: string
   try {
@@ -219,10 +226,16 @@ async function moveRelative(currentRelPath: string, newFolderRel: string): Promi
 
   await fs.mkdir(newFolderAbs, { recursive: true })
 
-  // Refuse to clobber an existing file at destination
+  // Move never overwrites. If a file already exists at the destination, flag
+  // the collision and let the caller decide what to do.
   const dstExists = await fs.stat(newAbs).catch(() => null)
   if (dstExists && dstExists.isFile()) {
-    return { ok: false, error: `Destination already exists: ${toRelPosix(root, newAbs)}` }
+    return {
+      ok: false,
+      collision: true,
+      newRelPath: toRelPosix(root, newAbs),
+      error: `Destination already exists: ${toRelPosix(root, newAbs)}`
+    }
   }
 
   try {
@@ -233,18 +246,108 @@ async function moveRelative(currentRelPath: string, newFolderRel: string): Promi
   }
 }
 
-export async function movePrompt(currentRelPath: string, newFolder: string): Promise<MoveResult> {
-  return moveRelative(currentRelPath, newFolder)
+function timestampSuffix(d: Date = new Date()): string {
+  const pad = (n: number, w = 2): string => String(n).padStart(w, '0')
+  return (
+    d.getFullYear().toString() +
+    pad(d.getMonth() + 1) +
+    pad(d.getDate()) +
+    '-' +
+    pad(d.getHours()) +
+    pad(d.getMinutes()) +
+    pad(d.getSeconds())
+  )
 }
 
+function appendBeforeExt(filename: string, suffix: string): string {
+  const ext = extname(filename)
+  const base = ext ? filename.slice(0, -ext.length) : filename
+  return `${base}.${suffix}${ext}`
+}
+
+// Archive auto-renames on collision instead of failing or overwriting. The
+// existing archived file is left untouched; the incoming file is renamed with
+// a timestamp suffix. If two archives collide within the same second, a
+// numeric counter is appended to keep both files.
 export async function archivePrompt(currentRelPath: string): Promise<MoveResult> {
-  return moveRelative(currentRelPath, ARCHIVE_FOLDER)
-}
+  const root = await requireRoot()
+  let oldAbs: string
+  try {
+    oldAbs = safeResolveWithin(root, currentRelPath)
+  } catch (err) {
+    return { ok: false, error: (err as Error).message }
+  }
+  const stat = await fs.stat(oldAbs).catch(() => null)
+  if (!stat || !stat.isFile()) {
+    return { ok: false, error: `Source file not found: ${currentRelPath}` }
+  }
 
-export function libraryRootPathSync(): string | null {
-  // Convenience for diagnostic logging only
-  return null
+  const filename = basename(oldAbs)
+  try {
+    assertValidFilename(filename)
+  } catch (err) {
+    return { ok: false, error: (err as Error).message }
+  }
+
+  let archiveFolderAbs: string
+  let archiveTargetAbs: string
+  try {
+    archiveFolderAbs = safeResolveWithin(root, ARCHIVE_FOLDER)
+    archiveTargetAbs = safeResolveWithin(root, join(ARCHIVE_FOLDER, filename))
+  } catch (err) {
+    return { ok: false, error: (err as Error).message }
+  }
+
+  // No-op if already at the archive location.
+  if (oldAbs === archiveTargetAbs) {
+    return { ok: true, newRelPath: toRelPosix(root, archiveTargetAbs) }
+  }
+
+  await fs.mkdir(archiveFolderAbs, { recursive: true })
+
+  let finalAbs = archiveTargetAbs
+  let autoRenamed = false
+
+  const exists = await fs.stat(finalAbs).catch(() => null)
+  if (exists && exists.isFile()) {
+    autoRenamed = true
+    const ts = timestampSuffix()
+    let candidate: string
+    try {
+      candidate = safeResolveWithin(root, join(ARCHIVE_FOLDER, appendBeforeExt(filename, ts)))
+    } catch (err) {
+      return { ok: false, error: (err as Error).message }
+    }
+    // If even the timestamped name collides (same-second archive of identical
+    // basename), tack on an incrementing counter until we find a free slot.
+    let counter = 1
+    // Cap the loop defensively; in practice we'll hit a free slot in one or
+    // two iterations.
+    while (counter < 1000) {
+      const candStat = await fs.stat(candidate).catch(() => null)
+      if (!candStat) break
+      try {
+        candidate = safeResolveWithin(
+          root,
+          join(ARCHIVE_FOLDER, appendBeforeExt(filename, `${ts}-${counter}`))
+        )
+      } catch (err) {
+        return { ok: false, error: (err as Error).message }
+      }
+      counter += 1
+    }
+    finalAbs = candidate
+  }
+
+  try {
+    await fs.rename(oldAbs, finalAbs)
+    const result: MoveResult = { ok: true, newRelPath: toRelPosix(root, finalAbs) }
+    if (autoRenamed) result.autoRenamed = true
+    return result
+  } catch (err) {
+    return { ok: false, error: (err as Error).message }
+  }
 }
 
 // Re-export for tests / diagnostics
-export const _internal = { toPosix, toRelPosix }
+export const _internal = { toPosix, toRelPosix, timestampSuffix, appendBeforeExt }
