@@ -36,3 +36,6 @@ __pycache__/
 # Test / coverage
 coverage/
 .nyc_output/
+
+# Local manual test libraries
+tmp-testing/
