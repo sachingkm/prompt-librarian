@@ -305,40 +305,48 @@ export async function archivePrompt(currentRelPath: string): Promise<MoveResult>
 
   await fs.mkdir(archiveFolderAbs, { recursive: true })
 
-  let finalAbs = archiveTargetAbs
+  let finalAbs: string | null = null
   let autoRenamed = false
 
-  const exists = await fs.stat(finalAbs).catch(() => null)
-  if (exists && exists.isFile()) {
+  const targetExists = await fs.stat(archiveTargetAbs).catch(() => null)
+  if (!targetExists) {
+    finalAbs = archiveTargetAbs
+  } else {
     autoRenamed = true
     const ts = timestampSuffix()
-    let candidate: string
-    try {
-      candidate = safeResolveWithin(root, join(ARCHIVE_FOLDER, appendBeforeExt(filename, ts)))
-    } catch (err) {
-      return { ok: false, error: (err as Error).message }
-    }
-    // If even the timestamped name collides (same-second archive of identical
-    // basename), tack on an incrementing counter until we find a free slot.
-    let counter = 1
-    // Cap the loop defensively; in practice we'll hit a free slot in one or
-    // two iterations.
-    while (counter < 1000) {
-      const candStat = await fs.stat(candidate).catch(() => null)
-      if (!candStat) break
+    // Try in order: <name>.<ts>.<ext>, <name>.<ts>-1.<ext>, <name>.<ts>-2.<ext>, ...
+    // Cap defensively so a hostile or pathological archive directory cannot
+    // wedge the loop. In normal use the first or second candidate is free.
+    const MAX_ATTEMPTS = 1000
+    for (let i = 0; i < MAX_ATTEMPTS; i++) {
+      const suffix = i === 0 ? ts : `${ts}-${i}`
+      let candidate: string
       try {
         candidate = safeResolveWithin(
           root,
-          join(ARCHIVE_FOLDER, appendBeforeExt(filename, `${ts}-${counter}`))
+          join(ARCHIVE_FOLDER, appendBeforeExt(filename, suffix))
         )
       } catch (err) {
         return { ok: false, error: (err as Error).message }
       }
-      counter += 1
+      const candStat = await fs.stat(candidate).catch(() => null)
+      if (!candStat) {
+        finalAbs = candidate
+        break
+      }
     }
-    finalAbs = candidate
+    if (!finalAbs) {
+      // Defensive: hand back a clear error rather than overwrite. Should be
+      // unreachable outside truly pathological archive states.
+      return {
+        ok: false,
+        collision: true,
+        error: 'Could not find a free archive filename'
+      }
+    }
   }
 
+  // finalAbs is now confirmed free (or was never occupied). Only rename now.
   try {
     await fs.rename(oldAbs, finalAbs)
     const result: MoveResult = { ok: true, newRelPath: toRelPosix(root, finalAbs) }
