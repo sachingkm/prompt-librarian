@@ -33,6 +33,10 @@ export function registerIpcHandlers(): void {
     return library.initLibrary(rootPath)
   })
 
+  ipcMain.handle(IPC.libraryCheckRoot, async () => {
+    return library.checkRoot()
+  })
+
   ipcMain.handle(IPC.libraryScan, async () => {
     return library.scanLibrary()
   })

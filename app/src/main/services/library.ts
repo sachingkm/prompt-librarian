@@ -3,6 +3,7 @@ import { join, dirname, basename, extname } from 'node:path'
 import matter from 'gray-matter'
 import {
   ARCHIVE_FOLDER,
+  CheckRootResult,
   DEFAULT_LIBRARY_FOLDERS,
   InitResult,
   MoveResult,
@@ -24,6 +25,27 @@ async function requireRoot(): Promise<string> {
     throw new Error(`Library root does not exist or is not a directory: ${root}`)
   }
   return root
+}
+
+// Cheap boot-time validity check. Used by the renderer to decide between
+// onboarding and main shell without doing a full library scan.
+export async function checkRoot(): Promise<CheckRootResult> {
+  let rootPath: string | null = null
+  try {
+    rootPath = await settings.getRootPath()
+    if (!rootPath) return { ok: false, rootPath: null, reason: 'unset' }
+    const stat = await fs.stat(rootPath).catch(() => null)
+    if (!stat) return { ok: false, rootPath, reason: 'missing' }
+    if (!stat.isDirectory()) return { ok: false, rootPath, reason: 'not-directory' }
+    return { ok: true, rootPath }
+  } catch (err) {
+    return {
+      ok: false,
+      rootPath,
+      reason: 'error',
+      error: (err as Error).message
+    }
+  }
 }
 
 export async function initLibrary(rootPath: string): Promise<InitResult> {

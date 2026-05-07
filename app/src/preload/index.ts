@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
 import {
+  CheckRootResult,
   IPC,
   InitResult,
   MoveResult,
@@ -18,6 +19,7 @@ const api: PromptLibrarianApi = {
     ipcRenderer.invoke(IPC.dialogChooseFolder, defaultPath) as Promise<string | null>,
   initLibrary: (rootPath) =>
     ipcRenderer.invoke(IPC.libraryInit, rootPath) as Promise<InitResult>,
+  checkRoot: () => ipcRenderer.invoke(IPC.libraryCheckRoot) as Promise<CheckRootResult>,
   scanLibrary: () => ipcRenderer.invoke(IPC.libraryScan) as Promise<Prompt[]>,
   savePrompt: (draft: PromptDraft, opts?: SaveOptions) =>
     ipcRenderer.invoke(IPC.promptSave, draft, opts) as Promise<SaveResult>,

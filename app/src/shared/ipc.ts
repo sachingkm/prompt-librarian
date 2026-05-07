@@ -6,6 +6,7 @@ export const IPC = {
   settingsSetRootPath: 'settings:setRootPath',
   dialogChooseFolder: 'dialog:chooseFolder',
   libraryInit: 'library:init',
+  libraryCheckRoot: 'library:checkRoot',
   libraryScan: 'library:scan',
   promptSave: 'prompt:save',
   promptMove: 'prompt:move',
@@ -65,6 +66,10 @@ export interface InitResult {
   errors: string[]
 }
 
+export type CheckRootResult =
+  | { ok: true; rootPath: string }
+  | { ok: false; rootPath: string | null; reason: 'unset' | 'missing' | 'not-directory' | 'error'; error?: string }
+
 export interface MoveResult {
   ok: boolean
   newRelPath?: string
@@ -94,6 +99,7 @@ export interface PromptLibrarianApi {
   setRootPath(p: string): Promise<void>
   chooseFolder(defaultPath?: string): Promise<string | null>
   initLibrary(rootPath: string): Promise<InitResult>
+  checkRoot(): Promise<CheckRootResult>
   scanLibrary(): Promise<Prompt[]>
   savePrompt(draft: PromptDraft, opts?: SaveOptions): Promise<SaveResult>
   movePrompt(currentRelPath: string, newFolder: string): Promise<MoveResult>
