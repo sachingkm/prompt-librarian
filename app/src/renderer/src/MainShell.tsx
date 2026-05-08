@@ -41,7 +41,16 @@ export default function MainShell({
       </header>
 
       <main className="main main-browser">
-        <LibraryBrowser />
+        {/*
+          key={rootPath} forces LibraryBrowser to unmount and remount when the
+          saved root changes (via Settings -> Change root folder, or via the
+          "Pick a different library" onboarding flow). The remount re-runs the
+          initial library:scan, so the sidebar counts and folder tree refresh
+          automatically without the user having to click "Refresh from disk".
+          Within a single root, LibraryBrowser preserves its own state across
+          re-renders.
+        */}
+        <LibraryBrowser key={rootPath} />
       </main>
 
       <footer className="status-bar">
