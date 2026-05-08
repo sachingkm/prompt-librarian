@@ -1,15 +1,22 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
+import type { ClassifierProvider } from '../shared/classifier'
 import {
+  AiStatus,
   CheckRootResult,
+  ClassifyRequest,
+  ClassifyResponse,
   IPC,
   InitResult,
   MoveResult,
   Prompt,
   PromptDraft,
   PromptLibrarianApi,
+  RulesPayload,
+  RulesResetResponse,
   SaveOptions,
-  SaveResult
+  SaveResult,
+  SecretSetResponse
 } from '../shared/ipc'
 
 const api: PromptLibrarianApi = {
@@ -21,12 +28,35 @@ const api: PromptLibrarianApi = {
     ipcRenderer.invoke(IPC.libraryInit, rootPath) as Promise<InitResult>,
   checkRoot: () => ipcRenderer.invoke(IPC.libraryCheckRoot) as Promise<CheckRootResult>,
   scanLibrary: () => ipcRenderer.invoke(IPC.libraryScan) as Promise<Prompt[]>,
+  listFolders: () => ipcRenderer.invoke(IPC.libraryListFolders) as Promise<string[]>,
   savePrompt: (draft: PromptDraft, opts?: SaveOptions) =>
     ipcRenderer.invoke(IPC.promptSave, draft, opts) as Promise<SaveResult>,
   movePrompt: (currentRelPath, newFolder) =>
     ipcRenderer.invoke(IPC.promptMove, currentRelPath, newFolder) as Promise<MoveResult>,
   archivePrompt: (currentRelPath) =>
-    ipcRenderer.invoke(IPC.promptArchive, currentRelPath) as Promise<MoveResult>
+    ipcRenderer.invoke(IPC.promptArchive, currentRelPath) as Promise<MoveResult>,
+  classify: (req: ClassifyRequest) =>
+    ipcRenderer.invoke(IPC.classifierClassify, req) as Promise<ClassifyResponse>,
+  getAiStatus: () => ipcRenderer.invoke(IPC.classifierGetAiStatus) as Promise<AiStatus>,
+  getRules: () => ipcRenderer.invoke(IPC.rulesGet) as Promise<RulesPayload>,
+  getRulesPath: () => ipcRenderer.invoke(IPC.rulesGetPath) as Promise<string | null>,
+  openRulesInEditor: () =>
+    ipcRenderer.invoke(IPC.rulesOpenInEditor) as Promise<{ ok: boolean; error?: string }>,
+  resetRules: () => ipcRenderer.invoke(IPC.rulesReset) as Promise<RulesResetResponse>,
+  reloadRules: () => ipcRenderer.invoke(IPC.rulesReload) as Promise<RulesPayload>,
+  getClassifierProvider: () =>
+    ipcRenderer.invoke(IPC.settingsGetClassifierProvider) as Promise<ClassifierProvider>,
+  setClassifierProvider: (p) =>
+    ipcRenderer.invoke(IPC.settingsSetClassifierProvider, p) as Promise<void>,
+  hasGeminiApiKey: () =>
+    ipcRenderer.invoke(IPC.settingsHasGeminiApiKey) as Promise<{
+      has: boolean
+      source: 'env' | 'stored' | 'none'
+    }>,
+  setGeminiApiKey: (key: string) =>
+    ipcRenderer.invoke(IPC.settingsSetGeminiApiKey, key) as Promise<SecretSetResponse>,
+  clearGeminiApiKey: () =>
+    ipcRenderer.invoke(IPC.settingsClearGeminiApiKey) as Promise<{ ok: boolean }>
 }
 
 if (process.contextIsolated) {

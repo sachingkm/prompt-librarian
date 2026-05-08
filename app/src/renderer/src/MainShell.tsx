@@ -2,6 +2,7 @@ import { useState } from 'react'
 import LibraryBrowser from './library/LibraryBrowser'
 import Phase1TestPanel from './Phase1TestPanel'
 import Settings from './Settings'
+import PromptIntake from './intake/PromptIntake'
 
 interface Props {
   rootPath: string
@@ -15,14 +16,25 @@ export default function MainShell({
   onChangeRoot
 }: Props): JSX.Element {
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [intakeOpen, setIntakeOpen] = useState(false)
   const [devOpen, setDevOpen] = useState(false)
+  // Bumping this number forces LibraryBrowser to remount and rescan,
+  // which we use after a successful save so the new prompt shows up.
+  const [browserKeySalt, setBrowserKeySalt] = useState(0)
 
   return (
     <div className="shell">
       <header className="title-bar">
         <span className="brand">Prompt Librarian</span>
-        <span className="phase-tag">Phase 3 - read-only library browser</span>
+        <span className="phase-tag">Phase 4A - intake + classifier</span>
         <span className="title-bar-actions">
+          <button
+            type="button"
+            onClick={() => setIntakeOpen(true)}
+            className="onboarding-primary"
+          >
+            + New prompt
+          </button>
           <button
             type="button"
             onClick={onChangeRoot}
@@ -42,15 +54,12 @@ export default function MainShell({
 
       <main className="main main-browser">
         {/*
-          key={rootPath} forces LibraryBrowser to unmount and remount when the
-          saved root changes (via Settings -> Change root folder, or via the
-          "Pick a different library" onboarding flow). The remount re-runs the
-          initial library:scan, so the sidebar counts and folder tree refresh
-          automatically without the user having to click "Refresh from disk".
-          Within a single root, LibraryBrowser preserves its own state across
-          re-renders.
+          key combines rootPath and browserKeySalt: rootPath changes force
+          a remount when the saved library changes (Phase 3); the salt
+          forces a remount after a successful save so the new prompt is
+          visible without the user having to click Refresh.
         */}
-        <LibraryBrowser key={rootPath} />
+        <LibraryBrowser key={`${rootPath}#${browserKeySalt}`} />
       </main>
 
       <footer className="status-bar">
@@ -62,22 +71,23 @@ export default function MainShell({
         <Settings
           rootPath={rootPath}
           onClose={() => setSettingsOpen(false)}
-          // Propagate the new root to App so the main shell behind the modal
-          // updates immediately, but DO NOT close the modal here. The user
-          // should be able to click "Re-initialize default structure" right
-          // after picking a new library, without losing context. Settings
-          // closes only when the user clicks Close.
           onRootChanged={(p) => onRootChanged(p)}
+        />
+      )}
+
+      {intakeOpen && (
+        <PromptIntake
+          onClose={() => setIntakeOpen(false)}
+          onSaved={() => {
+            setIntakeOpen(false)
+            setBrowserKeySalt((n) => n + 1)
+          }}
         />
       )}
 
       {/*
         Phase 1 test surface stays available in dev only, behind a floating
-        disclosure pinned to the bottom-right. Production builds get neither
-        the JSX nor the imported module (Vite tree-shakes the static import
-        when the only reference is dead code under `import.meta.env.DEV`).
-        It sits outside the normal app flow: collapsed by default, never
-        intrudes on the library browser layout.
+        disclosure pinned to the bottom-right.
       */}
       {import.meta.env.DEV && (
         <details

@@ -1038,3 +1038,111 @@ body,
 .dev-floating-body .phase1-panel {
   flex: 1;
 }
+
+/* ===== Phase 4A intake + classifier additions ===== */
+
+.modal-backdrop.nested {
+  background: rgba(0, 0, 0, 0.65);
+  z-index: 60;
+  padding-top: 120px;
+}
+
+.intake-panel {
+  max-width: 760px;
+  width: 100%;
+}
+
+.settings-panel {
+  max-width: 700px;
+  width: 100%;
+}
+
+.intake-textarea {
+  width: 100%;
+  min-height: 220px;
+  padding: 10px 12px;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-family: var(--mono);
+  font-size: 12.5px;
+  resize: vertical;
+}
+
+.intake-status {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.intake-review {
+  display: flex;
+  flex-direction: column;
+}
+
+.intake-review .reasoning .dim {
+  font-size: 12.5px;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: 110px 1fr;
+  gap: 8px 12px;
+  align-items: center;
+}
+
+.form-grid label {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  align-self: center;
+}
+
+.form-grid input[type='text'],
+.form-grid input[type='password'],
+.form-grid select {
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 6px 8px;
+  font-family: var(--mono);
+  font-size: 12.5px;
+  width: 100%;
+}
+
+.radio-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  margin-bottom: 4px;
+}
+
+.confidence-chip {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 8px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.confidence-chip[data-tier='high'] {
+  color: #5cc97a;
+  border-color: rgba(92, 201, 122, 0.4);
+}
+
+.confidence-chip[data-tier='medium'] {
+  color: #e0a64a;
+  border-color: rgba(224, 166, 74, 0.4);
+}
+
+.confidence-chip[data-tier='low'] {
+  color: var(--muted);
+}

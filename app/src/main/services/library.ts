@@ -89,6 +89,36 @@ export async function initLibrary(rootPath: string): Promise<InitResult> {
   return { ok: errors.length === 0, rootPath, created, alreadyExisted, errors }
 }
 
+// Walk subdirectories (depth-first) under root and report relative folder
+// paths in POSIX form. Skips dot-prefixed dirs (.git, .prompt-librarian,
+// etc.) so app metadata never leaks into folder choices.
+async function* walkFolders(dir: string, root: string): AsyncGenerator<string> {
+  let entries: import('node:fs').Dirent[]
+  try {
+    entries = await fs.readdir(dir, { withFileTypes: true })
+  } catch {
+    return
+  }
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue
+    if (entry.name.startsWith('.')) continue
+    const full = join(dir, entry.name)
+    const rel = toRelPosix(root, full)
+    yield rel
+    yield* walkFolders(full, root)
+  }
+}
+
+// Listed for the classifier (not for general renderer use). Pure folder
+// names, no prompt contents read. Defers to the saved root.
+export async function listFolders(): Promise<string[]> {
+  const root = await requireRoot()
+  const out: string[] = []
+  for await (const f of walkFolders(root, root)) out.push(f)
+  out.sort()
+  return out
+}
+
 async function* walkMarkdown(dir: string, root: string): AsyncGenerator<string> {
   let entries: import('node:fs').Dirent[]
   try {

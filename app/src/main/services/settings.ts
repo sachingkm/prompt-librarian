@@ -1,9 +1,11 @@
 import { app } from 'electron'
 import { promises as fs } from 'node:fs'
 import { join } from 'node:path'
+import type { ClassifierProvider } from '../../shared/classifier'
 
 interface SettingsShape {
   rootPath?: string | null
+  classifierProvider?: ClassifierProvider
 }
 
 const SETTINGS_FILENAME = 'settings.json'
@@ -39,5 +41,17 @@ export async function getRootPath(): Promise<string | null> {
 export async function setRootPath(p: string | null): Promise<void> {
   const s = await readSettings()
   s.rootPath = p
+  await writeSettings(s)
+}
+
+export async function getClassifierProvider(): Promise<ClassifierProvider> {
+  const s = await readSettings()
+  // Default = deterministic so the app works offline out of the box.
+  return s.classifierProvider === 'gemini' ? 'gemini' : 'deterministic'
+}
+
+export async function setClassifierProvider(p: ClassifierProvider): Promise<void> {
+  const s = await readSettings()
+  s.classifierProvider = p
   await writeSettings(s)
 }
