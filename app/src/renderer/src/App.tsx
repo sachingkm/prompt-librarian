@@ -54,7 +54,23 @@ function App(): JSX.Element {
 
   if (stage === 'onboarding' || !rootPath) {
     const ctx: CheckRootResult = checkResult ?? { ok: false, rootPath: null, reason: 'unset' }
-    return <Onboarding checkResult={ctx} onComplete={onOnboardingComplete} />
+    // Only offer a cancel path when we have a valid current root to return to.
+    // For true first-run (no saved root) and missing/deleted-root recovery
+    // (rootPath was cleared during refreshBoot), there is no fallback, so we
+    // leave onCancel undefined and the user must pick a folder.
+    const cancelHandler = rootPath
+      ? () => {
+          setCheckResult({ ok: true, rootPath })
+          setStage('main')
+        }
+      : undefined
+    return (
+      <Onboarding
+        checkResult={ctx}
+        onComplete={onOnboardingComplete}
+        onCancel={cancelHandler}
+      />
+    )
   }
 
   return (

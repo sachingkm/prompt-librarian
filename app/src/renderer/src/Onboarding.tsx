@@ -6,6 +6,12 @@ type Mode = 'pick' | 'use-existing' | 'create-new'
 interface Props {
   checkResult: CheckRootResult
   onComplete: (rootPath: string) => void
+  // Optional escape hatch. When provided, a "Back to current library" button is
+  // rendered on the pick screen so the user can bail out of re-onboarding
+  // without abandoning a still-valid current root. Should only be supplied
+  // when there is in fact a valid current root to return to (i.e. the user
+  // navigated here voluntarily, not because of missing-root recovery).
+  onCancel?: () => void
 }
 
 function recoveryBanner(check: CheckRootResult): string | null {
@@ -20,7 +26,7 @@ function recoveryBanner(check: CheckRootResult): string | null {
   return `Could not load saved library: ${check.error ?? 'unknown error'}`
 }
 
-export default function Onboarding({ checkResult, onComplete }: Props): JSX.Element {
+export default function Onboarding({ checkResult, onComplete, onCancel }: Props): JSX.Element {
   const [mode, setMode] = useState<Mode>('pick')
   const [pickedPath, setPickedPath] = useState<string | null>(null)
   const [initStructure, setInitStructure] = useState<boolean>(true)
@@ -97,37 +103,52 @@ export default function Onboarding({ checkResult, onComplete }: Props): JSX.Elem
         {banner && <div className="onboarding-banner">{banner}</div>}
 
         {mode === 'pick' && (
-          <div className="onboarding-choices">
-            <section className="onboarding-choice">
-              <h2>Use an existing prompt library</h2>
-              <p className="dim">
-                Pick a folder you already have. Nothing inside it will be deleted or
-                rearranged.
-              </p>
-              <button
-                className="onboarding-primary"
-                disabled={busy}
-                onClick={() => pickFolder('use-existing')}
-              >
-                Choose folder
-              </button>
-            </section>
+          <>
+            <div className="onboarding-choices">
+              <section className="onboarding-choice">
+                <h2>Use an existing prompt library</h2>
+                <p className="dim">
+                  Pick a folder you already have. Nothing inside it will be deleted or
+                  rearranged.
+                </p>
+                <button
+                  className="onboarding-primary"
+                  disabled={busy}
+                  onClick={() => pickFolder('use-existing')}
+                >
+                  Choose folder
+                </button>
+              </section>
 
-            <section className="onboarding-choice">
-              <h2>Create a new prompt library</h2>
-              <p className="dim">
-                Pick or create a folder. The default folder structure can be added in one
-                step.
-              </p>
-              <button
-                className="onboarding-primary"
-                disabled={busy}
-                onClick={() => pickFolder('create-new')}
-              >
-                Choose or create folder
-              </button>
-            </section>
-          </div>
+              <section className="onboarding-choice">
+                <h2>Create a new prompt library</h2>
+                <p className="dim">
+                  Pick or create a folder. The default folder structure can be added in one
+                  step.
+                </p>
+                <button
+                  className="onboarding-primary"
+                  disabled={busy}
+                  onClick={() => pickFolder('create-new')}
+                >
+                  Choose or create folder
+                </button>
+              </section>
+            </div>
+
+            {onCancel && (
+              <div className="onboarding-actions onboarding-cancel-row">
+                <button
+                  type="button"
+                  className="onboarding-secondary"
+                  disabled={busy}
+                  onClick={onCancel}
+                >
+                  Back to current library
+                </button>
+              </div>
+            )}
+          </>
         )}
 
         {mode !== 'pick' && pickedPath && (

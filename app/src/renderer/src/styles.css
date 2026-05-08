@@ -444,6 +444,11 @@ body,
   gap: 8px;
 }
 
+.onboarding-cancel-row {
+  margin-top: 16px;
+  justify-content: center;
+}
+
 .onboarding-primary,
 .onboarding-secondary {
   background: var(--bg);
