@@ -431,6 +431,16 @@ body,
   color: #ff6b6b;
 }
 
+.onboarding-info {
+  padding: 10px 12px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: 3px;
+  font-size: 12.5px;
+  color: var(--text);
+}
+
 .onboarding-errors {
   margin: 6px 0 0 16px;
   padding: 0;

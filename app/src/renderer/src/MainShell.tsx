@@ -60,10 +60,12 @@ export default function MainShell({ rootPath, onRootChanged, onChangeRoot }: Pro
         <Settings
           rootPath={rootPath}
           onClose={() => setSettingsOpen(false)}
-          onRootChanged={(p) => {
-            setSettingsOpen(false)
-            onRootChanged(p)
-          }}
+          // Propagate the new root to App so the main shell behind the modal
+          // updates immediately, but DO NOT close the modal here. The user
+          // should be able to click "Re-initialize default structure" right
+          // after picking a new library, without losing context. Settings
+          // closes only when the user clicks Close.
+          onRootChanged={(p) => onRootChanged(p)}
         />
       )}
     </div>

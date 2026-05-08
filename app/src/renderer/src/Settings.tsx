@@ -10,17 +10,26 @@ interface Props {
 export default function Settings({ rootPath, onClose, onRootChanged }: Props): JSX.Element {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [info, setInfo] = useState<string | null>(null)
   const [initSummary, setInitSummary] = useState<InitResult | null>(null)
 
   async function changeRoot(): Promise<void> {
     setBusy(true)
     setError(null)
+    setInfo(null)
     setInitSummary(null)
     try {
       const picked = await window.api.chooseFolder(rootPath)
       if (!picked) return
       await window.api.setRootPath(picked)
+      // Tell App about the new root so the main shell behind the modal
+      // updates. The modal itself stays open (MainShell no longer closes it
+      // here) so the user can immediately click Re-initialize for the new
+      // root if they want to.
       onRootChanged(picked)
+      setInfo(
+        'Root changed. Initialize the default folder structure if this is a new library.'
+      )
     } catch (err) {
       setError((err as Error).message)
     } finally {
@@ -31,6 +40,7 @@ export default function Settings({ rootPath, onClose, onRootChanged }: Props): J
   async function reinit(): Promise<void> {
     setBusy(true)
     setError(null)
+    setInfo(null)
     setInitSummary(null)
     try {
       const result = await window.api.initLibrary(rootPath)
@@ -67,6 +77,12 @@ export default function Settings({ rootPath, onClose, onRootChanged }: Props): J
             </button>
           </div>
         </section>
+
+        {info && (
+          <section className="modal-section">
+            <div className="onboarding-info">{info}</div>
+          </section>
+        )}
 
         {initSummary && (
           <section className="modal-section">
