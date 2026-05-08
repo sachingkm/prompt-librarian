@@ -45,10 +45,16 @@ export default function MainShell({ rootPath, onRootChanged, onChangeRoot }: Pro
           </div>
         </div>
 
-        <details className="dev-section" open={devOpen} onToggle={(e) => setDevOpen((e.target as HTMLDetailsElement).open)}>
-          <summary>Phase 1 test surface (developer / smoke tests)</summary>
-          {devOpen && <Phase1TestPanel />}
-        </details>
+        {import.meta.env.DEV && (
+          <details
+            className="dev-section"
+            open={devOpen}
+            onToggle={(e) => setDevOpen((e.target as HTMLDetailsElement).open)}
+          >
+            <summary>Phase 1 test surface (developer / smoke tests)</summary>
+            {devOpen && <Phase1TestPanel />}
+          </details>
+        )}
       </main>
 
       <footer className="status-bar">
