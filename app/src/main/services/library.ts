@@ -108,6 +108,19 @@ async function* walkMarkdown(dir: string, root: string): AsyncGenerator<string> 
   }
 }
 
+// js-yaml (used by gray-matter) auto-parses ISO timestamp strings into Date
+// objects when the YAML schema sees them. The IPC contract declares
+// `created_at` and `updated_at` as strings, so coerce here at the boundary.
+// Anything else (numbers, etc.) is stringified rather than dropped.
+function normalizeDateField(v: unknown): string | undefined {
+  if (v == null) return undefined
+  if (v instanceof Date) {
+    return isNaN(v.getTime()) ? undefined : v.toISOString()
+  }
+  if (typeof v === 'string') return v
+  return String(v)
+}
+
 export async function scanLibrary(): Promise<Prompt[]> {
   const root = await requireRoot()
   const out: Prompt[] = []
@@ -121,7 +134,9 @@ export async function scanLibrary(): Promise<Prompt[]> {
       const relPath = toRelPosix(root, abs)
       const frontmatter: PromptFrontmatter = {
         title: typeof fm.title === 'string' ? fm.title : filename.replace(/\.md$/i, ''),
-        ...fm
+        ...fm,
+        created_at: normalizeDateField(fm.created_at),
+        updated_at: normalizeDateField(fm.updated_at)
       }
       out.push({
         relPath,
