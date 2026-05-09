@@ -10,6 +10,7 @@ import type {
   ReuseLevel,
   Scope
 } from '../../../shared/classifier'
+import { GEMINI_DISCLOSURE } from '../../../shared/geminiDisclosure'
 import ClassificationReview from './ClassificationReview'
 
 interface Props {
@@ -23,7 +24,6 @@ type Stage = 'compose' | 'review'
 
 interface ConfirmGeminiState {
   open: boolean
-  freeTierDisclosure: boolean
 }
 
 function nowIso(): string {
@@ -40,8 +40,7 @@ export default function PromptIntake({ onClose, onSaved }: Props): JSX.Element {
   const [classification, setClassification] = useState<ClassificationResult | null>(null)
   const [folders, setFolders] = useState<string[]>([])
   const [confirmGemini, setConfirmGemini] = useState<ConfirmGeminiState>({
-    open: false,
-    freeTierDisclosure: false
+    open: false
   })
   const geminiAcknowledgedRef = useRef(false)
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
@@ -122,12 +121,15 @@ export default function PromptIntake({ onClose, onSaved }: Props): JSX.Element {
       void runGemini()
       return
     }
-    setConfirmGemini({ open: true, freeTierDisclosure: aiStatus?.keySource !== 'env' })
-  }, [aiAvailable, aiStatus, runGemini])
+    // Always show the data-use disclosure on the first call of a session,
+    // regardless of how the key was supplied. Free-tier vs paid-tier data
+    // policy applies to the request itself, not to the key source.
+    setConfirmGemini({ open: true })
+  }, [aiAvailable, runGemini])
 
   const acceptGemini = useCallback((): void => {
     geminiAcknowledgedRef.current = true
-    setConfirmGemini({ open: false, freeTierDisclosure: false })
+    setConfirmGemini({ open: false })
     void runGemini()
   }, [runGemini])
 
@@ -267,12 +269,7 @@ export default function PromptIntake({ onClose, onSaved }: Props): JSX.Element {
                   schema to the configured Gemini API provider. Local deterministic classification
                   does not.
                 </p>
-                {confirmGemini.freeTierDisclosure && (
-                  <p className="dim">
-                    Per current Google docs, free-tier Gemini requests may be used to improve
-                    Google products. Paid-tier requests are not.
-                  </p>
-                )}
+                <p className="dim">{GEMINI_DISCLOSURE}</p>
                 <p className="dim">
                   No library files or local paths are sent. The deterministic suggestion is
                   included as a hint.
@@ -280,7 +277,7 @@ export default function PromptIntake({ onClose, onSaved }: Props): JSX.Element {
                 <div className="modal-actions">
                   <button
                     className="onboarding-secondary"
-                    onClick={() => setConfirmGemini({ open: false, freeTierDisclosure: false })}
+                    onClick={() => setConfirmGemini({ open: false })}
                   >
                     Cancel
                   </button>

@@ -1,11 +1,15 @@
 // Gemini classifier. Lives in main, never in renderer. The API key never
 // leaves main; the renderer can only call classify() through IPC.
 //
-// Defaults verified against https://ai.google.dev/gemini-api/docs/pricing
-// (gemini-2.5-flash-lite: free tier eligible, paid $0.10/$0.40 per 1M
-// input/output tokens). Free-tier inputs may be used by Google to improve
-// their products - that disclosure is surfaced in Settings and the
-// in-app confirm dialog.
+// Verified against Gemini pricing docs 2026-05-08; re-verify quarterly.
+// Source: https://ai.google.dev/gemini-api/docs/pricing
+// gemini-2.5-flash-lite: free tier eligible, paid $0.10/$0.40 per 1M
+// input/output tokens.
+//
+// Free-tier inputs may be used by Google to improve their products;
+// paid-tier inputs are not. The disclosure copy is centralized in
+// shared/geminiDisclosure.ts and surfaced in both Settings and the
+// in-app confirm dialog regardless of how the key was supplied.
 //
 // Rate limits per official docs at the time of writing point to AI
 // Studio's per-account dashboard rather than a fixed published table.

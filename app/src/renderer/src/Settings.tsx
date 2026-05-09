@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { AiStatus, InitResult, RulesPayload } from '../../shared/ipc'
 import type { ClassifierProvider } from '../../shared/classifier'
+import { GEMINI_DISCLOSURE } from '../../shared/geminiDisclosure'
 
 interface Props {
   rootPath: string
@@ -361,9 +362,9 @@ export default function Settings({ rootPath, onClose, onRootChanged }: Props): J
           <p className="dim">
             Get a Gemini API key at <code>https://aistudio.google.com/apikey</code>. The key is
             stored encrypted via OS keychain when available, and is sent only when you click
-            &quot;Improve with Gemini&quot;. Per current Google docs, free-tier requests may be
-            used to improve Google products; paid-tier requests are not.
+            &quot;Improve with Gemini&quot;.
           </p>
+          <p className="dim">{GEMINI_DISCLOSURE}</p>
         </section>
 
         <p className="dim modal-foot">
