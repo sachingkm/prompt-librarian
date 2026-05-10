@@ -1,15 +1,23 @@
-// Phase 4A intake. The user pastes raw text, runs deterministic classify,
-// optionally runs Gemini "improve", reviews/edits, and saves. No autosave;
-// save uses the existing prompt:save IPC.
+// Phase 4A/4B intake. The user pastes raw text, runs deterministic OR
+// Gemini classify, reviews/edits, and saves. No autosave; save uses the
+// existing prompt:save IPC. After save, if the user changed any
+// classification field versus the suggestion, a correction is appended
+// to corrections.jsonl through the classifier IPC layer.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { AiStatus, RulesPayload, SaveResult } from '../../../shared/ipc'
+import type {
+  AiStatus,
+  ClassifyFallbackMarker,
+  RulesPayload,
+  SaveResult
+} from '../../../shared/ipc'
 import type {
   ClassificationResult,
   ClassifierError,
   ReuseLevel,
   Scope
 } from '../../../shared/classifier'
+import type { CorrectionMetadata } from '../../../shared/correction'
 import { GEMINI_DISCLOSURE } from '../../../shared/geminiDisclosure'
 import ClassificationReview from './ClassificationReview'
 
@@ -39,6 +47,18 @@ export default function PromptIntake({ onClose, onSaved }: Props): JSX.Element {
   const [rulesPayload, setRulesPayload] = useState<RulesPayload | null>(null)
   const [classification, setClassification] = useState<ClassificationResult | null>(null)
   const [folders, setFolders] = useState<string[]>([])
+  // Phase 4B: keep the original classifier suggestion separate from the
+  // (mutated by user) classification so corrections.jsonl can record the
+  // actual diff between suggested and accepted.
+  const [suggestedBaseline, setSuggestedBaseline] = useState<ClassificationResult | null>(null)
+  // Phase 4B: stash any fallback marker returned alongside the result.
+  const [fallback, setFallback] = useState<ClassifyFallbackMarker | null>(null)
+  // Phase 4B: when a Gemini fallback to deterministic happens, the user
+  // can compare the deterministic result side-by-side. This holds the
+  // unaltered deterministic.
+  const [deterministicSnapshot, setDeterministicSnapshot] = useState<ClassificationResult | null>(
+    null
+  )
   const [confirmGemini, setConfirmGemini] = useState<ConfirmGeminiState>({
     open: false
   })
@@ -76,6 +96,7 @@ export default function PromptIntake({ onClose, onSaved }: Props): JSX.Element {
   const runDeterministicClassify = useCallback(async (): Promise<void> => {
     setBusy(true)
     setError(null)
+    setFallback(null)
     try {
       const resp = await window.api.classify({
         rawText,
@@ -86,6 +107,8 @@ export default function PromptIntake({ onClose, onSaved }: Props): JSX.Element {
         return
       }
       setClassification(resp.result)
+      setSuggestedBaseline(resp.result)
+      setDeterministicSnapshot(resp.result)
       setStage('review')
     } catch (err) {
       setError((err as Error).message)
@@ -95,20 +118,25 @@ export default function PromptIntake({ onClose, onSaved }: Props): JSX.Element {
   }, [rawText])
 
   // Run a Gemini classify (router will run deterministic internally for the
-  // hint) and advance to review.
+  // hint) and advance to review. If Gemini fails, the response still has
+  // ok=true with the deterministic fallback and a fallback marker.
   const runGeminiClassifyToReview = useCallback(async (): Promise<void> => {
     setBusy(true)
     setError(null)
+    setFallback(null)
     try {
-      const resp = await window.api.classify({
-        rawText,
-        provider: 'gemini'
-      })
+      // Always grab a fresh deterministic snapshot for compare-mode.
+      const detResp = await window.api.classify({ rawText, provider: 'deterministic' })
+      if (detResp.ok) setDeterministicSnapshot(detResp.result)
+
+      const resp = await window.api.classify({ rawText, provider: 'gemini' })
       if (!resp.ok) {
         setError(formatClassifierError(resp.error))
         return
       }
+      if (resp.fallback) setFallback(resp.fallback)
       setClassification(resp.result)
+      setSuggestedBaseline(resp.result)
       setStage('review')
     } catch (err) {
       setError((err as Error).message)
@@ -118,10 +146,10 @@ export default function PromptIntake({ onClose, onSaved }: Props): JSX.Element {
   }, [rawText])
 
   // "Improve" path used from the review stage (deterministic already ran).
-  // Carries the deterministic result as a hint for Gemini.
   const runGeminiImprove = useCallback(async (): Promise<void> => {
     setBusy(true)
     setError(null)
+    setFallback(null)
     try {
       const resp = await window.api.classify({
         rawText,
@@ -132,7 +160,9 @@ export default function PromptIntake({ onClose, onSaved }: Props): JSX.Element {
         setError(formatClassifierError(resp.error))
         return
       }
+      if (resp.fallback) setFallback(resp.fallback)
       setClassification(resp.result)
+      setSuggestedBaseline(resp.result)
     } catch (err) {
       setError((err as Error).message)
     } finally {
@@ -214,11 +244,51 @@ export default function PromptIntake({ onClose, onSaved }: Props): JSX.Element {
       }
       const result = await window.api.savePrompt(draft, opts)
       if (result.ok && result.path && result.relPath) {
+        // Phase 4B: append a correction record IF the user accepted
+        // anything different from the suggested baseline. Best-effort -
+        // we never block save on logging.
+        if (suggestedBaseline) {
+          const acceptedFilename =
+            collisionStrategy === 'rename' && newFilename ? newFilename : draftFields.filename
+          const accepted: CorrectionMetadata = {
+            title: draftFields.title,
+            category: draftFields.category,
+            subcategory: draftFields.subcategory ?? '',
+            tags: draftFields.tags,
+            reuse: draftFields.reuse,
+            scope: draftFields.scope,
+            recommendedFolder: draftFields.recommendedFolder,
+            filename: acceptedFilename
+          }
+          const suggested: CorrectionMetadata = {
+            title: suggestedBaseline.title,
+            category: suggestedBaseline.category,
+            subcategory: suggestedBaseline.subcategory ?? '',
+            tags: suggestedBaseline.tags,
+            reuse: suggestedBaseline.reuse,
+            scope: suggestedBaseline.scope,
+            recommendedFolder: suggestedBaseline.recommendedFolder,
+            filename: suggestedBaseline.filename
+          }
+          try {
+            await window.api.appendCorrection({
+              rawText,
+              classifierId: suggestedBaseline.classifierId,
+              provider: suggestedBaseline.provider,
+              suggested,
+              accepted,
+              matchedKeywords: suggestedBaseline.reasoning.matchedKeywords,
+              matchedTriggers: suggestedBaseline.reasoning.matchedTriggers
+            })
+          } catch {
+            // best-effort; learning continues to work without this record
+          }
+        }
         onSaved({ relPath: result.relPath, path: result.path })
       }
       return result
     },
-    [rawText, onSaved]
+    [rawText, onSaved, suggestedBaseline]
   )
 
   return (
@@ -297,6 +367,8 @@ export default function PromptIntake({ onClose, onSaved }: Props): JSX.Element {
             aiStatus={aiStatus}
             busy={busy}
             error={error}
+            fallback={fallback}
+            deterministicSnapshot={deterministicSnapshot}
             onUpdate={(next) => setClassification(next)}
             onImproveWithGemini={aiAvailable ? handleImproveWithGemini : null}
             onBack={() => {

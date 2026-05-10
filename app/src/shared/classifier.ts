@@ -60,6 +60,19 @@ export interface ClassificationResult {
   reasoning: ClassificationReasoning
 }
 
+// Few-shot example for AI providers: small, sanitized record of a past
+// user correction. Phase 4B. Bodies are NEVER included; only previews.
+export interface FewShotExample {
+  preview: string
+  suggestedCategory: string
+  suggestedFolder: string
+  acceptedCategory: string
+  acceptedFolder: string
+  acceptedTags: string[]
+  acceptedReuse: string
+  acceptedScope: string
+}
+
 export interface ClassificationInput {
   rawText: string
   rules: ClassifierRules
@@ -71,6 +84,8 @@ export interface ClassificationInput {
   allowedCategories: string[]
   // Optional deterministic result fed to AI providers as a hint.
   deterministicHint?: ClassificationResult
+  // Optional few-shot examples derived from corrections.jsonl.
+  fewShotExamples?: FewShotExample[]
 }
 
 export interface Classifier {

@@ -3,7 +3,12 @@
 // which calls prompt:save and surfaces collisions.
 
 import { useState } from 'react'
-import type { AiStatus, RulesPayload, SaveResult } from '../../../shared/ipc'
+import type {
+  AiStatus,
+  ClassifyFallbackMarker,
+  RulesPayload,
+  SaveResult
+} from '../../../shared/ipc'
 import type {
   ClassificationResult,
   ConfidenceTier,
@@ -18,6 +23,9 @@ interface Props {
   aiStatus: AiStatus | null
   busy: boolean
   error: string | null
+  // Phase 4B
+  fallback?: ClassifyFallbackMarker | null
+  deterministicSnapshot?: ClassificationResult | null
   onUpdate: (next: ClassificationResult) => void
   onImproveWithGemini: (() => void) | null
   onBack: () => void
@@ -44,6 +52,8 @@ export default function ClassificationReview({
   aiStatus,
   busy,
   error,
+  fallback,
+  deterministicSnapshot,
   onUpdate,
   onImproveWithGemini,
   onBack,
@@ -53,6 +63,7 @@ export default function ClassificationReview({
   const [saveError, setSaveError] = useState<string | null>(null)
   const [collision, setCollision] = useState<CollisionState | null>(null)
   const [renameInput, setRenameInput] = useState('')
+  const [showCompare, setShowCompare] = useState(false)
 
   const ruleFolders = rulesPayload
     ? Array.from(new Set([...folders, ...folderListFromRules(rulesPayload)]))
@@ -100,6 +111,30 @@ export default function ClassificationReview({
 
   return (
     <div className="intake-review">
+      {fallback && (
+        <section className="modal-section">
+          <div className="onboarding-info">
+            Gemini unavailable - deterministic result shown. Reason: {fallback.reason}.
+            {deterministicSnapshot && (
+              <button
+                type="button"
+                className="onboarding-secondary"
+                style={{ marginLeft: 8 }}
+                onClick={() => setShowCompare((v) => !v)}
+              >
+                {showCompare ? 'Hide deterministic result' : 'Show deterministic result'}
+              </button>
+            )}
+          </div>
+          {showCompare && deterministicSnapshot && (
+            <div className="dim">
+              Deterministic suggested: <strong>{deterministicSnapshot.category}</strong> -{' '}
+              {deterministicSnapshot.recommendedFolder}
+            </div>
+          )}
+        </section>
+      )}
+
       <section className="modal-section">
         <div className="phase1-label">
           {classification.classifierId === 'ai-gemini-v1' ? 'Suggested by Gemini' : 'Suggested locally'}

@@ -1,7 +1,7 @@
-// Vitest spec for the deterministic classifier. Runs against the
-// FIXTURES list with DEFAULT_CLASSIFIER_RULES, plus a handful of targeted
-// scenarios for custom rules, negativeKeywords, priority, and archive
-// avoidance.
+// Vitest spec for the deterministic classifier. Most fixtures run against
+// TEST_CLASSIFIER_RULES (a richer taxonomy) so engine coverage stays
+// intact while the shipped DEFAULT_CLASSIFIER_RULES is intentionally
+// minimal in Phase 4B.
 
 import { describe, expect, it } from 'vitest'
 import {
@@ -13,9 +13,12 @@ import {
 } from '../../../../shared/classifierRules'
 import type { ClassificationInput } from '../../../../shared/classifier'
 import { classifyDeterministic, windowsSafeSlug } from './classifier'
-import { FIXTURES } from './fixtures'
+import { FIXTURES, TEST_CLASSIFIER_RULES } from './fixtures'
 
-function input(text: string, rules: ClassifierRules = DEFAULT_CLASSIFIER_RULES): ClassificationInput {
+function input(
+  text: string,
+  rules: ClassifierRules = TEST_CLASSIFIER_RULES
+): ClassificationInput {
   return {
     rawText: text,
     rules,
@@ -24,7 +27,7 @@ function input(text: string, rules: ClassifierRules = DEFAULT_CLASSIFIER_RULES):
   }
 }
 
-describe('deterministic classifier - default rules fixtures', () => {
+describe('deterministic classifier - test rules fixtures', () => {
   for (const fx of FIXTURES) {
     it(`${fx.name} -> ${fx.expectedFolder}`, () => {
       const r = classifyDeterministic(input(fx.text))
@@ -47,12 +50,38 @@ describe('deterministic classifier - default rules fixtures', () => {
   }
 })
 
+describe('deterministic classifier - DEFAULT (minimal) rules', () => {
+  it('routes a transcript prompt into Transform / Transcript Cleanup', () => {
+    const r = classifyDeterministic(
+      input(
+        'Clean up this transcript. Remove [inaudible] markers, attribute speakers and timestamps.',
+        DEFAULT_CLASSIFIER_RULES
+      )
+    )
+    expect(r.category).toBe('Transform')
+    expect(r.recommendedFolder).toBe('01-Transform/Transcript Cleanup')
+  })
+
+  it('routes a generic create prompt into Create', () => {
+    const r = classifyDeterministic(
+      input('Draft a short product update email.', DEFAULT_CLASSIFIER_RULES)
+    )
+    expect(r.category).toBe('Create')
+  })
+
+  it('routes a no-match prompt to fallback', () => {
+    const r = classifyDeterministic(input('Tell me a joke.', DEFAULT_CLASSIFIER_RULES))
+    expect(r.recommendedFolder).toBe('00-Index')
+    expect(r.category).toBe('Uncategorized')
+  })
+})
+
 describe('deterministic classifier - custom rules', () => {
   it('custom category outside defaults can win', () => {
     const customRules: ClassifierRules = {
       version: CLASSIFIER_RULES_VERSION,
       categories: [
-        ...DEFAULT_CLASSIFIER_RULES.categories,
+        ...TEST_CLASSIFIER_RULES.categories,
         {
           id: 'sql-snippets',
           label: 'SQL snippets',
@@ -67,10 +96,10 @@ describe('deterministic classifier - custom rules', () => {
           tags: ['sql']
         }
       ],
-      projects: DEFAULT_CLASSIFIER_RULES.projects,
-      fallback: DEFAULT_CLASSIFIER_RULES.fallback,
-      scoring: DEFAULT_CLASSIFIER_RULES.scoring,
-      reuseDefaults: DEFAULT_CLASSIFIER_RULES.reuseDefaults
+      projects: TEST_CLASSIFIER_RULES.projects,
+      fallback: TEST_CLASSIFIER_RULES.fallback,
+      scoring: TEST_CLASSIFIER_RULES.scoring,
+      reuseDefaults: TEST_CLASSIFIER_RULES.reuseDefaults
     }
     const r = classifyDeterministic(
       input('Write a SQL query that uses GROUP BY and a window function.', customRules)
@@ -81,29 +110,20 @@ describe('deterministic classifier - custom rules', () => {
   })
 
   it('negativeKeyword suppresses an otherwise winning category', () => {
-    // Take a copy of Core Transforms and add "classifier" as a negative.
     const rules: ClassifierRules = JSON.parse(
-      JSON.stringify(DEFAULT_CLASSIFIER_RULES)
+      JSON.stringify(TEST_CLASSIFIER_RULES)
     ) as ClassifierRules
     const core = rules.categories.find((c) => c.id === 'core-transforms')!
     core.negativeKeywords = ['classifier']
 
-    // "transcript" matches Core Transforms for +3, but "classifier" as
-    // a negative subtracts the default 3-point penalty, dropping the rule
-    // to score=0 which suppresses it. No other category matches.
     const r = classifyDeterministic(
-      input(
-        'I want to extend the prompt classifier to handle transcripts.',
-        rules
-      )
+      input('I want to extend the prompt classifier to handle transcripts.', rules)
     )
     expect(r.recommendedFolder).not.toBe('01-Core Transforms')
     expect(r.reasoning.suppressedBy ?? []).toContain('Core Transforms')
   })
 
   it('project priority 5 trigger beats a higher-scoring category', () => {
-    // Career Buddy has priority 5 and trigger "Career Buddy".
-    // Build a prompt full of transcript keywords plus the trigger.
     const r = classifyDeterministic(
       input(
         'For Career Buddy: transcript transcript transcript with multiple speakers and timestamps.'
@@ -116,11 +136,10 @@ describe('deterministic classifier - custom rules', () => {
 
   it('disabled category falls through to next-best rule', () => {
     const rules: ClassifierRules = JSON.parse(
-      JSON.stringify(DEFAULT_CLASSIFIER_RULES)
+      JSON.stringify(TEST_CLASSIFIER_RULES)
     ) as ClassifierRules
     const core = rules.categories.find((c) => c.id === 'core-transforms')!
     core.enabled = false
-    // Same prompt as transcript-to-dialogue fixture.
     const r = classifyDeterministic(
       input(
         'Clean up this transcript. Remove [inaudible], collapse filler words, and produce a clean speaker-attributed dialogue with timestamps.',
@@ -130,7 +149,7 @@ describe('deterministic classifier - custom rules', () => {
     expect(r.recommendedFolder).not.toBe('01-Core Transforms')
   })
 
-  it('archive folder is never selected for a typical new prompt under defaults', () => {
+  it('archive folder is never selected for any fixture', () => {
     for (const fx of FIXTURES) {
       const r = classifyDeterministic(input(fx.text))
       expect(r.recommendedFolder.startsWith('99-Archive')).toBe(false)
@@ -139,20 +158,14 @@ describe('deterministic classifier - custom rules', () => {
 
   it('rule referencing a missing folder still classifies but adds a note', () => {
     const rules: ClassifierRules = JSON.parse(
-      JSON.stringify(DEFAULT_CLASSIFIER_RULES)
+      JSON.stringify(TEST_CLASSIFIER_RULES)
     ) as ClassifierRules
     const sub = rules.categories[0].subcategories?.[0]
     if (sub) sub.folder = '07-Brand-New-Folder'
     const r = classifyDeterministic({
-      ...input(
-        'Clean up this transcript and remove inaudible markers.',
-        rules
-      ),
-      // Pretend on-disk folders are only the defaults excluding the new sub.
-      allowedFolders: collectRuleFolders(DEFAULT_CLASSIFIER_RULES)
+      ...input('Clean up this transcript and remove inaudible markers.', rules),
+      allowedFolders: collectRuleFolders(TEST_CLASSIFIER_RULES)
     })
-    // The sub fires (matches "inaudible") and recommended folder is the
-    // not-yet-on-disk folder, with a reasoning note about it.
     expect(r.recommendedFolder).toBe('07-Brand-New-Folder')
     expect(r.reasoning.notes.some((n) => n.includes('not present'))).toBe(true)
   })

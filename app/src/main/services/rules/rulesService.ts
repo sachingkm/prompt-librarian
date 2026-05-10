@@ -35,9 +35,16 @@ async function ensureMetaDir(libraryRoot: string): Promise<void> {
 async function writeRulesFile(libraryRoot: string, rules: ClassifierRules): Promise<void> {
   await ensureMetaDir(libraryRoot)
   const file = rulesPath(libraryRoot)
-  // Atomic write: temp file + rename.
+  // Atomic write: temp file -> fsync -> rename. On Windows we can't fsync
+  // the directory itself, but rename across the same volume is atomic.
   const tmp = file + '.tmp'
-  await fs.writeFile(tmp, JSON.stringify(rules, null, 2) + '\n', 'utf8')
+  const fh = await fs.open(tmp, 'w')
+  try {
+    await fh.writeFile(JSON.stringify(rules, null, 2) + '\n', 'utf8')
+    await fh.sync()
+  } finally {
+    await fh.close()
+  }
   await fs.rename(tmp, file)
 }
 
@@ -126,6 +133,35 @@ export async function loadRules(
     validation,
     usingDefaults: false,
     path
+  }
+}
+
+// Validate-then-atomic-write. The current file on disk is left untouched
+// when validation fails. Returns the freshly-loaded RulesPayload (so the
+// renderer doesn't have to re-fetch).
+export async function writeRules(
+  libraryRoot: string,
+  candidate: ClassifierRules,
+  knownFolders: string[] = []
+): Promise<LoadedRules> {
+  const validation = validateClassifierRules(candidate, knownFolders)
+  if (!validation.ok) {
+    // Don't write. Surface validation back to caller alongside the file
+    // we still have on disk (which we re-load fresh).
+    const existing = await loadRules(libraryRoot, knownFolders)
+    return {
+      rules: existing.rules,
+      validation,
+      usingDefaults: existing.usingDefaults,
+      path: existing.path
+    }
+  }
+  await writeRulesFile(libraryRoot, candidate)
+  return {
+    rules: candidate,
+    validation,
+    usingDefaults: false,
+    path: rulesPath(libraryRoot)
   }
 }
 

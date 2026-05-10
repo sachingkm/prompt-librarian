@@ -102,6 +102,16 @@ export function buildGeminiPrompt(input: ClassificationInput): Compact {
     )
     userParts.push('')
   }
+  if (input.fewShotExamples && input.fewShotExamples.length > 0) {
+    userParts.push('RECENT USER-APPROVED CORRECTIONS - use as examples, do not blindly copy.')
+    userParts.push(
+      '(Each example shows what the classifier suggested vs what the user accepted.)'
+    )
+    for (const ex of input.fewShotExamples) {
+      userParts.push(JSON.stringify(ex))
+    }
+    userParts.push('')
+  }
   userParts.push('Prompt to classify:')
   userParts.push('---')
   userParts.push(rawText)

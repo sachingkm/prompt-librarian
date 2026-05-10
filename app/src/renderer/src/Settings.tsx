@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import type { AiStatus, InitResult, RulesPayload } from '../../shared/ipc'
+import type { AiStatus, InitResult, LearningSettings, RulesPayload } from '../../shared/ipc'
 import type { ClassifierProvider } from '../../shared/classifier'
 import { GEMINI_DISCLOSURE } from '../../shared/geminiDisclosure'
 
@@ -7,9 +7,12 @@ interface Props {
   rootPath: string
   onClose: () => void
   onRootChanged: (newRoot: string) => void
+  onOpenEditor?: () => void
 }
 
-export default function Settings({ rootPath, onClose, onRootChanged }: Props): JSX.Element {
+type ProviderChoice = 'auto' | 'deterministic' | 'gemini'
+
+export default function Settings({ rootPath, onClose, onRootChanged, onOpenEditor }: Props): JSX.Element {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [info, setInfo] = useState<string | null>(null)
@@ -18,22 +21,28 @@ export default function Settings({ rootPath, onClose, onRootChanged }: Props): J
   // Phase 4A additions: rules + Gemini status.
   const [rulesPayload, setRulesPayload] = useState<RulesPayload | null>(null)
   const [aiStatus, setAiStatus] = useState<AiStatus | null>(null)
-  const [provider, setProvider] = useState<ClassifierProvider>('deterministic')
+  const [providerChoice, setProviderChoice] = useState<ProviderChoice>('auto')
   const [keyInput, setKeyInput] = useState('')
   const [keyMessage, setKeyMessage] = useState<string | null>(null)
   const [confirmReset, setConfirmReset] = useState(false)
   const [rulesError, setRulesError] = useState<string | null>(null)
 
+  // Phase 4B: Learning section.
+  const [learning, setLearning] = useState<LearningSettings | null>(null)
+  const [confirmClearCorrections, setConfirmClearCorrections] = useState(false)
+
   const refreshAiAndRules = useCallback(async () => {
     try {
-      const [status, prov, rules] = await Promise.all([
+      const [status, rules, learningResp] = await Promise.all([
         window.api.getAiStatus(),
-        window.api.getClassifierProvider(),
-        window.api.getRules()
+        window.api.getRules(),
+        window.api.getLearningSettings()
       ])
       setAiStatus(status)
-      setProvider(prov)
       setRulesPayload(rules)
+      setLearning(learningResp)
+      // Provider choice = 'auto' when no manual override is set.
+      setProviderChoice(status.manualOverride ?? 'auto')
     } catch (err) {
       setRulesError((err as Error).message)
     }
@@ -123,13 +132,80 @@ export default function Settings({ rootPath, onClose, onRootChanged }: Props): J
     }
   }
 
-  async function changeProvider(p: ClassifierProvider): Promise<void> {
+  async function changeProvider(choice: ProviderChoice): Promise<void> {
     setBusy(true)
     try {
-      await window.api.setClassifierProvider(p)
-      setProvider(p)
+      await window.api.setClassifierProvider(choice)
+      setProviderChoice(choice)
       const status = await window.api.getAiStatus()
       setAiStatus(status)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  // Phase 4B Learning helpers.
+  async function toggleLearning(field: keyof LearningSettings, value: boolean): Promise<void> {
+    setBusy(true)
+    try {
+      const updated = await window.api.setLearningSettings({ [field]: value })
+      setLearning(updated)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function analyzeCorrections(): Promise<void> {
+    setBusy(true)
+    try {
+      const r = await window.api.analyzeCorrections()
+      setKeyMessage(`Analyzed corrections - created ${r.created.length} proposal(s).`)
+      const learn = await window.api.getLearningSettings()
+      setLearning(learn)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function clearCorrectionHistory(): Promise<void> {
+    setBusy(true)
+    try {
+      await window.api.clearCorrections()
+      const learn = await window.api.getLearningSettings()
+      setLearning(learn)
+      setConfirmClearCorrections(false)
+      setKeyMessage('Correction history cleared.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function exportRules(): Promise<void> {
+    setBusy(true)
+    setRulesError(null)
+    try {
+      const r = await window.api.exportRules()
+      if (!r.ok) {
+        if (r.error) setRulesError(r.error)
+      } else if (r.path) {
+        setKeyMessage(`Exported rules.json to ${r.path}`)
+      }
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function importRules(): Promise<void> {
+    setBusy(true)
+    setRulesError(null)
+    try {
+      const r = await window.api.importRules()
+      if (!r.ok) {
+        if (r.error) setRulesError(r.error)
+      } else if (r.rules) {
+        setRulesPayload(r.rules)
+        setKeyMessage('Rules imported.')
+      }
     } finally {
       setBusy(false)
     }
@@ -246,6 +322,15 @@ export default function Settings({ rootPath, onClose, onRootChanged }: Props): J
                   </ul>
                 )}
               <div className="modal-actions">
+                {onOpenEditor && (
+                  <button
+                    className="onboarding-primary"
+                    onClick={onOpenEditor}
+                    disabled={busy}
+                  >
+                    Open editor
+                  </button>
+                )}
                 <button className="onboarding-secondary" onClick={openRules} disabled={busy}>
                   Open rules.json
                 </button>
@@ -258,6 +343,12 @@ export default function Settings({ rootPath, onClose, onRootChanged }: Props): J
                   disabled={busy}
                 >
                   Reset to defaults...
+                </button>
+                <button className="onboarding-secondary" onClick={exportRules} disabled={busy}>
+                  Export...
+                </button>
+                <button className="onboarding-secondary" onClick={importRules} disabled={busy}>
+                  Import...
                 </button>
               </div>
               {rulesError && (
@@ -300,22 +391,32 @@ export default function Settings({ rootPath, onClose, onRootChanged }: Props): J
                 <input
                   type="radio"
                   name="classifierProvider"
+                  value="auto"
+                  checked={providerChoice === 'auto'}
+                  onChange={() => void changeProvider('auto')}
+                />
+                Auto (Gemini when configured, deterministic otherwise)
+              </label>
+              <label className="radio-row">
+                <input
+                  type="radio"
+                  name="classifierProvider"
                   value="deterministic"
-                  checked={provider === 'deterministic'}
+                  checked={providerChoice === 'deterministic'}
                   onChange={() => void changeProvider('deterministic')}
                 />
-                Deterministic (default, offline, free)
+                Deterministic (force offline, free)
               </label>
               <label className="radio-row">
                 <input
                   type="radio"
                   name="classifierProvider"
                   value="gemini"
-                  checked={provider === 'gemini'}
+                  checked={providerChoice === 'gemini'}
                   onChange={() => void changeProvider('gemini')}
                   disabled={!aiStatus?.geminiAvailable}
                 />
-                Google Gemini (free tier available, requires API key)
+                Google Gemini (force, requires API key)
               </label>
             </div>
 
@@ -365,6 +466,90 @@ export default function Settings({ rootPath, onClose, onRootChanged }: Props): J
             &quot;Improve with Gemini&quot;.
           </p>
           <p className="dim">{GEMINI_DISCLOSURE}</p>
+        </section>
+
+        {/* Phase 4B: Learning from corrections */}
+        <section className="modal-section">
+          <div className="phase1-label">Learning from corrections</div>
+          {learning ? (
+            <>
+              <div className="dim">
+                Corrections recorded: {learning.correctionCount} &middot; Pending proposals:{' '}
+                {learning.pendingProposalCount}
+              </div>
+              <label className="radio-row">
+                <input
+                  type="checkbox"
+                  checked={learning.suggestRuleAdditions}
+                  onChange={(e) => void toggleLearning('suggestRuleAdditions', e.target.checked)}
+                  disabled={busy}
+                />
+                Suggest rule additions from patterns
+              </label>
+              <label className="radio-row">
+                <input
+                  type="checkbox"
+                  checked={learning.useCorrectionsAsExamples}
+                  onChange={(e) =>
+                    void toggleLearning('useCorrectionsAsExamples', e.target.checked)
+                  }
+                  disabled={busy}
+                />
+                Use recent corrections as Gemini examples
+              </label>
+              <div className="modal-actions">
+                <button
+                  className="onboarding-secondary"
+                  onClick={analyzeCorrections}
+                  disabled={busy || learning.correctionCount === 0}
+                >
+                  Analyze corrections
+                </button>
+                <button
+                  className="onboarding-secondary"
+                  onClick={() => setConfirmClearCorrections(true)}
+                  disabled={busy || learning.correctionCount === 0}
+                >
+                  Clear correction history...
+                </button>
+                <button
+                  className="onboarding-secondary"
+                  onClick={() => void window.api.openLearningFolder()}
+                  disabled={busy}
+                >
+                  Open learning folder
+                </button>
+              </div>
+              {confirmClearCorrections && (
+                <div className="onboarding-info">
+                  This permanently deletes <code>corrections.jsonl</code>. Your saved prompts
+                  and rules.json are not affected.
+                  <div className="modal-actions">
+                    <button
+                      className="onboarding-secondary"
+                      onClick={() => setConfirmClearCorrections(false)}
+                      disabled={busy}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      className="onboarding-primary"
+                      onClick={clearCorrectionHistory}
+                      disabled={busy}
+                    >
+                      Confirm clear
+                    </button>
+                  </div>
+                </div>
+              )}
+              <p className="dim">
+                Prompt Librarian records your review corrections locally so it can suggest
+                better rules. It does not change your taxonomy unless you approve.
+              </p>
+            </>
+          ) : (
+            <div className="dim">Loading learning settings...</div>
+          )}
         </section>
 
         <p className="dim modal-foot">

@@ -93,143 +93,82 @@ export interface ClassifierRulesValidation {
 
 export const DEFAULT_NEGATIVE_KEYWORD_PENALTY = 3
 
+// Minimal generic starter taxonomy. Phase 4B.
+//
+// Existing libraries with a rules.json on disk are NEVER overwritten by a
+// later DEFAULT change - the seeder only writes defaults to a brand-new
+// file. The "Reset to defaults" button re-writes whatever is current here.
 export const DEFAULT_CLASSIFIER_RULES: ClassifierRules = {
   version: CLASSIFIER_RULES_VERSION,
   categories: [
     {
-      id: 'core-transforms',
-      label: 'Core Transforms',
-      folder: '01-Core Transforms',
+      id: 'transform',
+      label: 'Transform',
+      folder: '01-Transform',
       enabled: true,
       priority: 0,
       keywords: [
+        { term: 'transform', weight: 2 },
+        { term: 'rewrite', weight: 2 },
+        { term: 'clean', weight: 2 },
+        { term: 'summarize', weight: 2 },
+        { term: 'format', weight: 1 },
         { term: 'transcript', weight: 3 },
-        { term: 'transcriber', weight: 2 },
-        { term: 'speaker', weight: 2 },
-        { term: 'timestamp', weight: 2 },
-        { term: 'inaudible', weight: 2 },
-        { term: 'dialogue', weight: 2 },
-        { term: 'rewrite', weight: 1 },
-        { term: 'summarize', weight: 1 },
-        { term: 'format', weight: 1 }
+        { term: 'convert', weight: 2 }
       ],
       tags: ['transform'],
       subcategories: [
         {
           id: 'transcript-cleanup',
           label: 'Transcript Cleanup',
-          folder: '01-Core Transforms',
+          folder: '01-Transform/Transcript Cleanup',
           enabled: true,
           keywords: [
+            { term: 'transcript', weight: 3 },
+            { term: 'speaker', weight: 2 },
+            { term: 'timestamp', weight: 2 },
             { term: 'inaudible', weight: 2 },
-            { term: 'cleanup', weight: 2 },
-            { term: 'verbatim', weight: 1 }
+            { term: 'dialogue', weight: 2 }
           ],
-          tags: ['cleanup']
+          tags: ['transcript', 'cleanup']
         }
       ]
     },
     {
-      id: 'interview',
-      label: 'Interview',
-      folder: '02-Interview',
+      id: 'create',
+      label: 'Create',
+      folder: '02-Create',
       enabled: true,
       priority: 0,
       keywords: [
-        { term: 'interview', weight: 3 },
-        { term: 'recruiter', weight: 2 },
-        { term: 'hiring manager', weight: 2 },
-        { term: 'star', weight: 2 },
-        { term: 'mock interview', weight: 3 },
-        { term: 'candidate', weight: 1 },
-        { term: 'interviewer', weight: 2 }
+        { term: 'create', weight: 2 },
+        { term: 'draft', weight: 2 },
+        { term: 'write', weight: 2 },
+        { term: 'generate', weight: 2 },
+        { term: 'template', weight: 2 },
+        { term: 'prompt', weight: 1 }
       ],
-      tags: ['interview']
-    },
-    {
-      id: 'job-search',
-      label: 'Job Search',
-      folder: '03-Job Search',
-      enabled: true,
-      priority: 0,
-      keywords: [
-        { term: 'resume', weight: 3 },
-        { term: 'jd', weight: 2 },
-        { term: 'job description', weight: 3 },
-        { term: 'role', weight: 1 },
-        { term: 'cover letter', weight: 3 },
-        { term: 'linkedin', weight: 2 },
-        { term: 'job application', weight: 3 }
-      ],
-      tags: ['job-search']
-    },
-    {
-      id: 'product-specs',
-      label: 'Product Specs',
-      folder: '04-Product Specs',
-      enabled: true,
-      priority: 0,
-      keywords: [
-        { term: 'prd', weight: 3 },
-        { term: 'specification', weight: 3 },
-        { term: 'architecture', weight: 2 },
-        { term: 'requirements', weight: 2 },
-        { term: 'feature', weight: 1 },
-        { term: 'acceptance criteria', weight: 3 },
-        { term: 'user story', weight: 3 }
-      ],
-      tags: ['product-spec']
-    },
-    {
-      id: 'research',
-      label: 'Research',
-      folder: '05-Research',
-      enabled: true,
-      priority: 0,
-      keywords: [
-        { term: 'research', weight: 3 },
-        { term: 'compare', weight: 2 },
-        { term: 'synthesis', weight: 2 },
-        { term: 'findings', weight: 2 },
-        { term: 'evidence', weight: 2 },
-        { term: 'analyze', weight: 1 }
-      ],
-      tags: ['research']
-    },
-    {
-      id: 'examples',
-      label: 'Examples',
-      folder: '90-Examples',
-      enabled: true,
-      priority: 0,
-      keywords: [
-        { term: 'example prompt', weight: 3 },
-        { term: 'sample prompt', weight: 3 },
-        { term: 'template', weight: 1 }
-      ],
-      tags: ['example']
+      tags: ['create'],
+      subcategories: [
+        {
+          id: 'prompt-template',
+          label: 'Prompt Template',
+          folder: '02-Create/Prompt Template',
+          enabled: true,
+          keywords: [
+            { term: 'reusable', weight: 2 },
+            { term: 'template', weight: 3 },
+            { term: 'instruction', weight: 2 },
+            { term: 'workflow', weight: 2 },
+            { term: 'prompt', weight: 1 }
+          ],
+          tags: ['template']
+        }
+      ]
     }
   ],
-  projects: [
-    {
-      id: 'career-buddy',
-      label: 'Career Buddy',
-      folder: '06-Project Prompts/Career Buddy',
-      enabled: true,
-      priority: 5,
-      triggers: ['Career Buddy'],
-      tags: ['career-buddy']
-    },
-    {
-      id: 'openclaw',
-      label: 'OpenClaw',
-      folder: '06-Project Prompts/OpenClaw',
-      enabled: true,
-      priority: 5,
-      triggers: ['OpenClaw'],
-      tags: ['openclaw']
-    }
-  ],
+  // No project triggers in the minimal default. Users add their own.
+  projects: [],
   fallback: {
     folder: '00-Index',
     label: 'Uncategorized'

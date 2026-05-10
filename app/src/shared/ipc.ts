@@ -1,8 +1,10 @@
 // Shared IPC contract between main process and renderer.
 // Channel names are referenced by both preload and main.
 
-import type { ClassifierProvider, ClassificationResult, ClassifierError } from './classifier'
+import type { ClassifierProvider, ClassificationResult, ClassifierError, ClassifierErrorCode } from './classifier'
 import type { ClassifierRules, ClassifierRulesValidation } from './classifierRules'
+import type { Correction, CorrectionMetadata } from './correction'
+import type { RuleProposal } from './proposal'
 
 export const IPC = {
   settingsGetRootPath: 'settings:getRootPath',
@@ -22,6 +24,20 @@ export const IPC = {
   rulesOpenInEditor: 'rules:openInEditor',
   rulesReset: 'rules:reset',
   rulesReload: 'rules:reload',
+  rulesWrite: 'rules:write',
+  rulesExport: 'rules:export',
+  rulesImport: 'rules:import',
+  correctionsAppend: 'corrections:append',
+  correctionsList: 'corrections:list',
+  correctionsClear: 'corrections:clear',
+  correctionsCount: 'corrections:count',
+  proposalsList: 'proposals:list',
+  proposalsAccept: 'proposals:accept',
+  proposalsReject: 'proposals:reject',
+  proposalsAnalyze: 'proposals:analyze',
+  learningGetSettings: 'learning:getSettings',
+  learningSetSettings: 'learning:setSettings',
+  learningOpenFolder: 'learning:openFolder',
   settingsGetClassifierProvider: 'settings:getClassifierProvider',
   settingsSetClassifierProvider: 'settings:setClassifierProvider',
   settingsHasGeminiApiKey: 'settings:hasGeminiApiKey',
@@ -94,17 +110,14 @@ export interface MoveResult {
   error?: string
 }
 
+// Minimal generic starter folders matching DEFAULT_CLASSIFIER_RULES plus
+// the always-present fallback (00-Index) and archive (99-Archive). Phase 4B.
 export const DEFAULT_LIBRARY_FOLDERS = [
   '00-Index',
-  '01-Core Transforms',
-  '02-Interview',
-  '03-Job Search',
-  '04-Product Specs',
-  '05-Research',
-  '06-Project Prompts',
-  '06-Project Prompts/Career Buddy',
-  '06-Project Prompts/OpenClaw',
-  '90-Examples',
+  '01-Transform',
+  '01-Transform/Transcript Cleanup',
+  '02-Create',
+  '02-Create/Prompt Template',
   '99-Archive'
 ] as const
 
@@ -119,21 +132,48 @@ export interface ClassifyRequest {
   deterministicHint?: ClassificationResult
 }
 
+// Phase 4B: when ok=true we may also include a fallback marker explaining
+// that Gemini was attempted but failed and the result shown is the local
+// deterministic fallback. The renderer surfaces this as an inline note.
+export interface ClassifyFallbackMarker {
+  fromProvider: ClassifierProvider
+  to: ClassifierProvider
+  reason: ClassifierErrorCode
+  message: string
+}
+
 export type ClassifyResponse =
-  | { ok: true; result: ClassificationResult }
+  | { ok: true; result: ClassificationResult; fallback?: ClassifyFallbackMarker }
   | { ok: false; error: ClassifierError }
 
 export interface AiStatus {
+  // The effective provider that will be used right now.
   provider: ClassifierProvider
+  // What the user explicitly chose, if anything.
+  manualOverride: ClassifierProvider | null
   geminiAvailable: boolean
-  // Where the key came from. 'env' means a process env var, 'stored' means
-  // safeStorage, 'none' means unavailable.
   keySource: 'env' | 'stored' | 'none'
   model: string | null
-  // Model couldn't be verified at app build time and the user must set
-  // PROMPT_LIBRARIAN_GEMINI_MODEL or accept the documented default. Also
-  // true if safeStorage is unavailable on this OS.
   warnings: string[]
+}
+
+export interface LearningSettings {
+  useCorrectionsAsExamples: boolean
+  suggestRuleAdditions: boolean
+  correctionCount: number
+  pendingProposalCount: number
+}
+
+export interface ImportRulesResponse {
+  ok: boolean
+  rules?: RulesPayload
+  error?: string
+}
+
+export interface ExportRulesResponse {
+  ok: boolean
+  path?: string
+  error?: string
 }
 
 export interface RulesPayload {
@@ -176,9 +216,37 @@ export interface PromptLibrarianApi {
   openRulesInEditor(): Promise<{ ok: boolean; error?: string }>
   resetRules(): Promise<RulesResetResponse>
   reloadRules(): Promise<RulesPayload>
+  writeRules(rules: ClassifierRules): Promise<RulesPayload>
+  exportRules(): Promise<ExportRulesResponse>
+  importRules(): Promise<ImportRulesResponse>
+  // Phase 4A backwards-compat: still works, treated as a manual override.
+  // Phase 4B: 'auto' clears the manual override so the AI-default rule
+  // applies (Gemini if key, deterministic otherwise).
   getClassifierProvider(): Promise<ClassifierProvider>
-  setClassifierProvider(p: ClassifierProvider): Promise<void>
+  setClassifierProvider(p: ClassifierProvider | 'auto'): Promise<void>
   hasGeminiApiKey(): Promise<{ has: boolean; source: 'env' | 'stored' | 'none' }>
   setGeminiApiKey(key: string): Promise<SecretSetResponse>
   clearGeminiApiKey(): Promise<{ ok: boolean }>
+  // Phase 4B learning loop:
+  appendCorrection(payload: AppendCorrectionPayload): Promise<{ ok: boolean; created?: RuleProposal[] }>
+  listCorrections(): Promise<{ corrections: Correction[]; malformedLineCount: number }>
+  countCorrections(): Promise<number>
+  clearCorrections(): Promise<{ ok: boolean }>
+  listProposals(): Promise<{ proposals: RuleProposal[] }>
+  acceptProposal(id: string): Promise<{ ok: boolean; rules?: RulesPayload; error?: string }>
+  rejectProposal(id: string): Promise<{ ok: boolean }>
+  analyzeCorrections(): Promise<{ created: RuleProposal[] }>
+  getLearningSettings(): Promise<LearningSettings>
+  setLearningSettings(s: Partial<LearningSettings>): Promise<LearningSettings>
+  openLearningFolder(): Promise<{ ok: boolean; error?: string }>
+}
+
+export interface AppendCorrectionPayload {
+  rawText: string
+  classifierId: 'deterministic-v1' | 'ai-gemini-v1'
+  provider: ClassifierProvider
+  suggested: CorrectionMetadata
+  accepted: CorrectionMetadata
+  matchedKeywords?: string[]
+  matchedTriggers?: string[]
 }
