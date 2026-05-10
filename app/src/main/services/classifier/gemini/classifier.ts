@@ -266,18 +266,34 @@ export async function callGemini(
   }
   clearTimeout(timer)
 
-  if (resp.status === 401 || resp.status === 403) {
-    return err('auth', `Gemini auth failed (${resp.status}). Check the API key.`)
-  }
-  if (resp.status === 429) return err('rate-limit', 'Gemini rate limit hit.')
   if (!resp.ok) {
-    let msg = `Gemini HTTP ${resp.status}`
+    // Read the body once so we can map status + body content together.
+    let body = ''
     try {
-      const txt = await resp.text()
-      if (txt) msg += `: ${txt.slice(0, 240)}`
+      body = await resp.text()
     } catch {
       // ignore
     }
+
+    if (resp.status === 429) return err('rate-limit', 'Gemini rate limit hit.')
+
+    // Google sometimes returns 400 INVALID_ARGUMENT instead of 401/403 for
+    // invalid API keys (e.g. a key from a project without the Generative
+    // Language API enabled). Surface those as the friendly auth code so the
+    // renderer shows a clean message instead of the raw Google envelope.
+    const isAuthFailure =
+      resp.status === 401 ||
+      resp.status === 403 ||
+      (resp.status === 400 && /api key not valid/i.test(body))
+    if (isAuthFailure) {
+      return err(
+        'auth',
+        'Gemini rejected the API key. Verify or replace it in Settings (Get a key at https://aistudio.google.com/apikey).'
+      )
+    }
+
+    let msg = `Gemini HTTP ${resp.status}`
+    if (body) msg += `: ${body.slice(0, 240)}`
     return err('unknown', msg)
   }
 
