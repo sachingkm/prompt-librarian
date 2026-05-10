@@ -32,7 +32,8 @@ interface Props {
   onSave: (
     draft: ClassificationResult,
     strategy: 'fail' | 'overwrite' | 'rename',
-    newFilename?: string
+    newFilename?: string,
+    addToTaxonomy?: boolean
   ) => Promise<SaveResult>
 }
 
@@ -64,6 +65,7 @@ export default function ClassificationReview({
   const [collision, setCollision] = useState<CollisionState | null>(null)
   const [renameInput, setRenameInput] = useState('')
   const [showCompare, setShowCompare] = useState(false)
+  const [addToTaxonomy, setAddToTaxonomy] = useState(false)
 
   const ruleFolders = rulesPayload
     ? Array.from(new Set([...folders, ...folderListFromRules(rulesPayload)]))
@@ -73,6 +75,18 @@ export default function ClassificationReview({
         .filter((c) => c.enabled !== false)
         .map((c) => c.label)
     : []
+
+  // Inline taxonomy-add affordance: only shown when the user's edited
+  // category is not already in the active rule set. Comparison is
+  // case-insensitive on the label.
+  const categoryIsNew = (() => {
+    if (!rulesPayload) return false
+    const norm = classification.category.trim().toLowerCase()
+    if (norm.length === 0) return false
+    return !rulesPayload.rules.categories.some(
+      (c) => c.label.trim().toLowerCase() === norm
+    )
+  })()
 
   function patch<K extends keyof ClassificationResult>(
     key: K,
@@ -88,7 +102,12 @@ export default function ClassificationReview({
     setSaveBusy(true)
     setSaveError(null)
     try {
-      const result = await onSave(classification, strategy, newName)
+      const result = await onSave(
+        classification,
+        strategy,
+        newName,
+        categoryIsNew && addToTaxonomy
+      )
       if (result.ok) {
         setCollision(null)
         return
@@ -225,6 +244,23 @@ export default function ClassificationReview({
             onChange={(e) => patch('filename', e.target.value)}
           />
         </div>
+        {categoryIsNew && (
+          <div className="intake-inline-add">
+            <label>New category detected</label>
+            <label className="radio-row">
+              <input
+                type="checkbox"
+                checked={addToTaxonomy}
+                onChange={(e) => setAddToTaxonomy(e.target.checked)}
+              />
+              Add &quot;{classification.category}&quot; to your taxonomy for future prompts
+            </label>
+            <div className="dim">
+              Rules are only updated after a successful save. Cancel leaves rules.json
+              untouched.
+            </div>
+          </div>
+        )}
       </section>
 
       <section className="modal-section reasoning">

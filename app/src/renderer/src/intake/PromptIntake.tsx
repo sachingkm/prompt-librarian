@@ -217,7 +217,8 @@ export default function PromptIntake({ onClose, onSaved }: Props): JSX.Element {
     async (
       draftFields: ClassificationResult,
       collisionStrategy: 'fail' | 'overwrite' | 'rename',
-      newFilename?: string
+      newFilename?: string,
+      addToTaxonomy?: boolean
     ): Promise<SaveResult> => {
       const created_at = nowIso()
       const updated_at = created_at
@@ -244,6 +245,44 @@ export default function PromptIntake({ onClose, onSaved }: Props): JSX.Element {
       }
       const result = await window.api.savePrompt(draft, opts)
       if (result.ok && result.path && result.relPath) {
+        // Phase 4B: post-save taxonomy add. Only fires when the user
+        // explicitly checked the inline "add to taxonomy" box and the
+        // save itself succeeded. Failure here is non-fatal.
+        if (addToTaxonomy && rulesPayload) {
+          try {
+            const baseId = draftFields.category
+              .toLowerCase()
+              .replace(/[^a-z0-9]+/g, '-')
+              .replace(/^-|-$/g, '')
+            const existingIds = new Set(rulesPayload.rules.categories.map((c) => c.id))
+            let id = baseId.length > 0 ? baseId : 'new-category'
+            let n = 2
+            while (existingIds.has(id)) {
+              id = `${baseId}-${n++}`
+            }
+            const nextRules = {
+              ...rulesPayload.rules,
+              categories: [
+                ...rulesPayload.rules.categories,
+                {
+                  id,
+                  label: draftFields.category,
+                  folder: draftFields.recommendedFolder,
+                  enabled: true,
+                  priority: 0,
+                  keywords: [],
+                  tags: draftFields.tags.slice(0, 4)
+                }
+              ]
+            }
+            const written = await window.api.writeRules(nextRules)
+            if (written.validation.ok) {
+              setRulesPayload(written)
+            }
+          } catch {
+            // non-fatal: prompt saved regardless of taxonomy write
+          }
+        }
         // Phase 4B: append a correction record IF the user accepted
         // anything different from the suggested baseline. Best-effort -
         // we never block save on logging.
@@ -288,7 +327,7 @@ export default function PromptIntake({ onClose, onSaved }: Props): JSX.Element {
       }
       return result
     },
-    [rawText, onSaved, suggestedBaseline]
+    [rawText, onSaved, suggestedBaseline, rulesPayload]
   )
 
   return (

@@ -3,6 +3,7 @@ import LibraryBrowser from './library/LibraryBrowser'
 import Phase1TestPanel from './Phase1TestPanel'
 import Settings from './Settings'
 import PromptIntake from './intake/PromptIntake'
+import RulesEditor from './rules/RulesEditor'
 
 interface Props {
   rootPath: string
@@ -17,6 +18,7 @@ export default function MainShell({
 }: Props): JSX.Element {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [intakeOpen, setIntakeOpen] = useState(false)
+  const [rulesEditorOpen, setRulesEditorOpen] = useState(false)
   const [devOpen, setDevOpen] = useState(false)
   // Bumping this number forces LibraryBrowser to remount and rescan,
   // which we use after a successful save so the new prompt shows up.
@@ -72,7 +74,20 @@ export default function MainShell({
           rootPath={rootPath}
           onClose={() => setSettingsOpen(false)}
           onRootChanged={(p) => onRootChanged(p)}
+          onOpenEditor={() => {
+            setSettingsOpen(false)
+            setRulesEditorOpen(true)
+          }}
         />
+      )}
+
+      {rulesEditorOpen && (
+        <div className="modal-backdrop" role="dialog" aria-modal="true" aria-label="Taxonomy editor">
+          <RulesEditor
+            onClose={() => setRulesEditorOpen(false)}
+            onRulesChanged={() => setBrowserKeySalt((n) => n + 1)}
+          />
+        </div>
       )}
 
       {intakeOpen && (
