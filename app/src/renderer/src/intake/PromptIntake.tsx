@@ -72,8 +72,8 @@ export default function PromptIntake({ onClose, onSaved }: Props): JSX.Element {
     [aiStatus]
   )
 
-  const handleClassify = useCallback(async (): Promise<void> => {
-    if (rawText.trim().length === 0) return
+  // Run a deterministic classify and advance to review.
+  const runDeterministicClassify = useCallback(async (): Promise<void> => {
     setBusy(true)
     setError(null)
     try {
@@ -94,7 +94,32 @@ export default function PromptIntake({ onClose, onSaved }: Props): JSX.Element {
     }
   }, [rawText])
 
-  const runGemini = useCallback(async (): Promise<void> => {
+  // Run a Gemini classify (router will run deterministic internally for the
+  // hint) and advance to review.
+  const runGeminiClassifyToReview = useCallback(async (): Promise<void> => {
+    setBusy(true)
+    setError(null)
+    try {
+      const resp = await window.api.classify({
+        rawText,
+        provider: 'gemini'
+      })
+      if (!resp.ok) {
+        setError(formatClassifierError(resp.error))
+        return
+      }
+      setClassification(resp.result)
+      setStage('review')
+    } catch (err) {
+      setError((err as Error).message)
+    } finally {
+      setBusy(false)
+    }
+  }, [rawText])
+
+  // "Improve" path used from the review stage (deterministic already ran).
+  // Carries the deterministic result as a hint for Gemini.
+  const runGeminiImprove = useCallback(async (): Promise<void> => {
     setBusy(true)
     setError(null)
     try {
@@ -115,23 +140,48 @@ export default function PromptIntake({ onClose, onSaved }: Props): JSX.Element {
     }
   }, [rawText, classification])
 
+  // After the disclosure is acknowledged, this fires the actual Gemini
+  // call. The pendingGeminiAction discriminates compose-stage classify
+  // (advance to review) vs review-stage improve (refine in place).
+  const pendingGeminiActionRef = useRef<'classify' | 'improve'>('classify')
+
+  const handleClassify = useCallback((): void => {
+    if (rawText.trim().length === 0) return
+    // Honour the saved provider. If Gemini is selected AND available, send
+    // straight to Gemini (after the first-use disclosure). Otherwise run
+    // deterministic locally.
+    const useGemini = aiStatus?.provider === 'gemini' && Boolean(aiStatus?.geminiAvailable)
+    if (!useGemini) {
+      void runDeterministicClassify()
+      return
+    }
+    if (geminiAcknowledgedRef.current) {
+      void runGeminiClassifyToReview()
+      return
+    }
+    pendingGeminiActionRef.current = 'classify'
+    setConfirmGemini({ open: true })
+  }, [rawText, aiStatus, runDeterministicClassify, runGeminiClassifyToReview])
+
   const handleImproveWithGemini = useCallback((): void => {
     if (!aiAvailable) return
     if (geminiAcknowledgedRef.current) {
-      void runGemini()
+      void runGeminiImprove()
       return
     }
-    // Always show the data-use disclosure on the first call of a session,
-    // regardless of how the key was supplied. Free-tier vs paid-tier data
-    // policy applies to the request itself, not to the key source.
+    pendingGeminiActionRef.current = 'improve'
     setConfirmGemini({ open: true })
-  }, [aiAvailable, runGemini])
+  }, [aiAvailable, runGeminiImprove])
 
   const acceptGemini = useCallback((): void => {
     geminiAcknowledgedRef.current = true
     setConfirmGemini({ open: false })
-    void runGemini()
-  }, [runGemini])
+    if (pendingGeminiActionRef.current === 'classify') {
+      void runGeminiClassifyToReview()
+    } else {
+      void runGeminiImprove()
+    }
+  }, [runGeminiClassifyToReview, runGeminiImprove])
 
   const handleSave = useCallback(
     async (
