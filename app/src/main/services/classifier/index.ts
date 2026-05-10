@@ -77,10 +77,28 @@ export async function getAiStatus(): Promise<AiStatusSnapshot> {
   return { provider, geminiAvailable, keySource, model, warnings }
 }
 
+// Debug-gated key fingerprint logger. Never logs the full key. Enable
+// with PROMPT_LIBRARIAN_DEBUG=1 when diagnosing "API key not valid" errors.
+function debugLogKey(source: 'env' | 'stored', key: string | null): void {
+  if (process.env.PROMPT_LIBRARIAN_DEBUG !== '1') return
+  if (!key) {
+    console.log(`[gemini-diag] resolveApiKey: source=${source} key=null`)
+    return
+  }
+  const fp = `${key.slice(0, 4)}...${key.slice(-4)}`
+  console.log(`[gemini-diag] resolveApiKey: source=${source} fp=${fp} len=${key.length}`)
+}
+
 async function resolveApiKey(): Promise<string | null> {
   const env = process.env[ENV_KEY]
-  if (env && env.trim().length > 0) return env.trim()
-  return secrets.readSecret()
+  if (env && env.trim().length > 0) {
+    const k = env.trim()
+    debugLogKey('env', k)
+    return k
+  }
+  const stored = await secrets.readSecret()
+  debugLogKey('stored', stored)
+  return stored
 }
 
 function resolveModel(): string {
