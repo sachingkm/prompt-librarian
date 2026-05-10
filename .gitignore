@@ -39,3 +39,6 @@ coverage/
 
 # Local manual test libraries
 tmp-testing/
+
+# Local status / presentation artifacts
+Status Update/
