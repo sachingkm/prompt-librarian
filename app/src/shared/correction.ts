@@ -1,10 +1,13 @@
 // Shape of a single correction event in <library-root>/.prompt-librarian/corrections.jsonl.
 //
-// Privacy: rawTextPreview is capped and intentionally truncated even for
-// short prompts, so corrections never persist the complete prompt body.
-// rawTextHash (sha-256 of the full body) lets the pattern detector
-// recognize duplicates without keeping the original. Absolute paths are
-// NEVER recorded.
+// Local-first storage: this app stores correction events on the user's
+// own disk under .prompt-librarian. Because correction quality drives
+// local learning, by default we record the full pasted prompt body in
+// `rawText`. We also keep a bounded `rawTextPreview` for UI display and
+// a `rawTextHash` (sha-256) for dedup. Absolute paths are NEVER recorded.
+//
+// Network/AI safety: Gemini few-shot only sends bounded snippets, not
+// `rawText`. See app/src/main/services/classifier/index.ts.
 
 export const CORRECTION_VERSION = 1
 export const RAW_TEXT_PREVIEW_MAX = 500
@@ -33,6 +36,11 @@ export interface CorrectionSignals {
 export interface Correction {
   version: number
   timestamp: string
+  // Full local prompt body. Stored on the user's disk only. Older
+  // correction records may omit this; consumers should fall back to
+  // rawTextPreview when rawText is undefined.
+  rawText?: string
+  // Bounded snippet for UI display and for Gemini few-shot examples.
   rawTextPreview: string
   rawTextHash: string
   classifierId: CorrectionClassifierId

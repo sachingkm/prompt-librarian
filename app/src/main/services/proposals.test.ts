@@ -27,7 +27,8 @@ function makeCorrection(
   preview: string,
   acceptedCategory: string,
   acceptedFolder: string,
-  ts: string = new Date().toISOString()
+  ts: string = new Date().toISOString(),
+  rawText?: string
 ): Correction {
   const md = (cat: string, folder: string): CorrectionMetadata => ({
     title: 'x',
@@ -42,6 +43,7 @@ function makeCorrection(
   return {
     version: 1,
     timestamp: ts,
+    rawText,
     rawTextPreview: preview,
     rawTextHash: ts, // not used
     classifierId: 'deterministic-v1',
@@ -70,6 +72,39 @@ describe('detectClusters', () => {
     }
     const out = detectClusters(corr)
     expect(out.find((c) => c.token === 'zoominfo')).toBeDefined()
+  })
+
+  it('uses rawText when available so phrases past the preview boundary still cluster', () => {
+    // Preview only contains stop-word filler. The discriminating token
+    // "telemetry" lives in rawText. Detector should still cluster on it.
+    const filler = 'the and for with that this from have'
+    const corr: Correction[] = []
+    for (let i = 0; i < PROPOSAL_TRIGGER_COUNT; i++) {
+      corr.push(
+        makeCorrection(
+          filler + ' ...',
+          'Engineering',
+          '07-Engineering',
+          new Date(2026, 0, 1, 0, i).toISOString(),
+          // Long rawText whose tail contains the real signal.
+          `${filler.repeat(20)} extra body. The user clearly cares about telemetry pipelines.`
+        )
+      )
+    }
+    const out = detectClusters(corr)
+    expect(out.find((c) => c.token === 'telemetry')).toBeDefined()
+  })
+
+  it('falls back to rawTextPreview when older records have no rawText', () => {
+    // No rawText on any record -> detector still works on previews.
+    const corr: Correction[] = []
+    for (let i = 0; i < PROPOSAL_TRIGGER_COUNT; i++) {
+      corr.push(
+        makeCorrection(`pipelines pipeline cluster ${i}`, 'Engineering', '07-Engineering')
+      )
+    }
+    const out = detectClusters(corr)
+    expect(out.find((c) => c.token === 'pipelines')).toBeDefined()
   })
 
   it('only considers the most recent window', () => {

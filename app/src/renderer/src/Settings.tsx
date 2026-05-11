@@ -543,8 +543,15 @@ export default function Settings({ rootPath, onClose, onRootChanged, onOpenEdito
                 </div>
               )}
               <p className="dim">
-                Prompt Librarian records your review corrections locally so it can suggest
-                better rules. It does not change your taxonomy unless you approve.
+                Correction events are stored locally under{' '}
+                <code>.prompt-librarian/corrections.jsonl</code> and may include the full
+                prompt text so the classifier can learn from real phrasing. They never
+                leave your machine on their own. Gemini few-shot only sends bounded
+                snippets, not the full body. Use Clear correction history to remove them.
+              </p>
+              <p className="dim">
+                Prompt Librarian does not change your taxonomy unless you accept a
+                proposal.
               </p>
             </>
           ) : (

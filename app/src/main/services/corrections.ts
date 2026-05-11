@@ -1,10 +1,16 @@
 // CorrectionsService - append-only JSONL of user corrections.
 //
-// Privacy:
-// - Stores rawTextPreview (capped at RAW_TEXT_PREVIEW_MAX) and a sha-256
-//   hash of the full body. The full body itself is never persisted.
-// - No absolute paths.
-// - User can clear with clearCorrections().
+// Local-first storage:
+// - This app keeps corrections on the user's own disk under
+//   .prompt-librarian. By default, each correction stores the FULL
+//   prompt body (`rawText`) so local learning (pattern detection,
+//   future on-device retrieval) has real text to work with.
+// - We also keep `rawTextPreview` (bounded snippet) for UI display and
+//   for sending to Gemini as few-shot examples. Gemini few-shot does
+//   NOT use `rawText`.
+// - `rawTextHash` (sha-256) provides dedup without comparing strings.
+// - No absolute paths are written.
+// - User can clear the entire history at any time via clearCorrections.
 //
 // File format: one JSON object per line. A malformed line is logged via
 // the warning callback and skipped, never crashes load.
@@ -43,11 +49,15 @@ export interface BuildCorrectionInput {
 export function buildCorrection(input: BuildCorrectionInput): Correction | null {
   const changedFields = metadataChangedFields(input.suggested, input.accepted)
   if (changedFields.length === 0) return null
+  const rawText = typeof input.rawText === 'string' ? input.rawText : ''
   return {
     version: CORRECTION_VERSION,
     timestamp: new Date().toISOString(),
-    rawTextPreview: clampPreview(input.rawText),
-    rawTextHash: sha256(input.rawText ?? ''),
+    // Local-first: keep the full body for local pattern detection. This
+    // stays on the user's disk; it is never sent to Gemini.
+    rawText,
+    rawTextPreview: clampPreview(rawText),
+    rawTextHash: sha256(rawText),
     classifierId: input.classifierId,
     provider: input.provider,
     suggested: { ...input.suggested },

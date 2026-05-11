@@ -66,7 +66,7 @@ describe('buildCorrection', () => {
     expect(c!.version).toBe(CORRECTION_VERSION)
   })
 
-  it('caps rawTextPreview and stores a hash, never the full body', () => {
+  it('caps rawTextPreview and stores a hash plus the full local rawText', () => {
     const huge = 'x'.repeat(2000)
     const c = buildCorrection({
       rawText: huge,
@@ -76,13 +76,16 @@ describe('buildCorrection', () => {
       accepted: { ...baseSuggested, title: 'Edited' }
     })
     expect(c).not.toBeNull()
+    // Preview stays bounded for UI display and Gemini few-shot.
     expect(c!.rawTextPreview.length).toBeLessThanOrEqual(RAW_TEXT_PREVIEW_MAX)
-    expect(c!.rawTextPreview).not.toContain(huge)
+    expect(c!.rawTextPreview).not.toBe(huge)
+    // Full local body is preserved for local learning.
+    expect(c!.rawText).toBe(huge)
     expect(c!.rawTextHash).toMatch(/^[a-f0-9]{64}$/)
   })
 
-  it('does not store the complete raw body even for short prompts', () => {
-    const short = 'Short prompt body with private specifics.'
+  it('stores the full local rawText even for short prompts', () => {
+    const short = 'Short prompt body about portfolio review tactics.'
     const c = buildCorrection({
       rawText: short,
       classifierId: 'deterministic-v1',
@@ -91,9 +94,10 @@ describe('buildCorrection', () => {
       accepted: { ...baseSuggested, title: 'Edited' }
     })
     expect(c).not.toBeNull()
-    expect(c!.rawTextPreview).not.toBe(short)
+    expect(c!.rawText).toBe(short)
+    // Preview remains a bounded snippet, not the full body.
+    expect(c!.rawTextPreview.length).toBeLessThan(short.length + 4)
     expect(c!.rawTextPreview).toMatch(/\.\.\.$/)
-    expect(short.startsWith(c!.rawTextPreview.replace(/\.\.\.$/, ''))).toBe(true)
   })
 
   it('truncates previews on a word boundary when practical', () => {

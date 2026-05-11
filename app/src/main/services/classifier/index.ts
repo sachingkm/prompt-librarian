@@ -252,6 +252,10 @@ interface FewShotExample {
 //    suggestion (strongest signal that the user prefers this routing),
 // 2) corrections that share any token with the prompt's matched keywords,
 // 3) most-recent fallback. Cap at FEWSHOT_MAX_EXAMPLES.
+//
+// Privacy: this builder only ever reads `rawTextPreview` (a bounded
+// snippet capped via clampPreview()). The local-only `rawText` field is
+// NEVER included in Gemini few-shot examples.
 function buildFewShotExamples(
   all: Correction[],
   hint: ClassificationResult
