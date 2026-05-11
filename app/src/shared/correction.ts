@@ -1,9 +1,10 @@
 // Shape of a single correction event in <library-root>/.prompt-librarian/corrections.jsonl.
 //
-// Privacy: rawTextPreview is capped at the first 500 chars of the user's
-// pasted prompt. The full body is NEVER recorded; rawTextHash (sha-256 of
-// the full body) lets the pattern detector recognize duplicates without
-// keeping the original. Absolute paths are NEVER recorded.
+// Privacy: rawTextPreview is capped and intentionally truncated even for
+// short prompts, so corrections never persist the complete prompt body.
+// rawTextHash (sha-256 of the full body) lets the pattern detector
+// recognize duplicates without keeping the original. Absolute paths are
+// NEVER recorded.
 
 export const CORRECTION_VERSION = 1
 export const RAW_TEXT_PREVIEW_MAX = 500
@@ -74,5 +75,16 @@ export function metadataChangedFields(
 
 export function clampPreview(rawText: string): string {
   if (typeof rawText !== 'string') return ''
-  return rawText.slice(0, RAW_TEXT_PREVIEW_MAX)
+  const normalized = rawText.replace(/\s+/g, ' ').trim()
+  if (normalized.length <= 1) return ''
+  const suffix = '...'
+  const hardLimit = Math.max(0, RAW_TEXT_PREVIEW_MAX - suffix.length)
+  const target =
+    normalized.length > RAW_TEXT_PREVIEW_MAX
+      ? hardLimit
+      : Math.min(normalized.length - 1, Math.max(12, Math.floor(normalized.length * 0.6)))
+  if (target <= 0) return ''
+  const boundary = normalized.lastIndexOf(' ', target)
+  const keep = boundary >= 12 ? boundary : target
+  return normalized.slice(0, keep).trimEnd() + suffix
 }

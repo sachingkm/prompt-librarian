@@ -184,9 +184,11 @@ export async function scanLibrary(): Promise<Prompt[]> {
   return out
 }
 
-function stringifyPrompt(draft: PromptDraft): string {
+export function stringifyPrompt(draft: PromptDraft): string {
   // gray-matter's stringify wraps in --- ... --- and a body
-  const fm = { ...draft.frontmatter }
+  const fm = Object.fromEntries(
+    Object.entries(draft.frontmatter).filter(([, value]) => value !== undefined)
+  )
   return matter.stringify(draft.body ?? '', fm)
 }
 

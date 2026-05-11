@@ -382,7 +382,8 @@ export default function RuleDetail({
           <input
             type="text"
             value={cat.id}
-            onChange={(e) => patch({ id: e.target.value })}
+            readOnly
+            title="Internal rule ID. Rename the label instead."
           />
           <label>Label</label>
           <input
@@ -469,7 +470,8 @@ export default function RuleDetail({
           <input
             type="text"
             value={sub.id}
-            onChange={(e) => patch({ id: e.target.value })}
+            readOnly
+            title="Internal rule ID. Rename the label instead."
           />
           <label>Label</label>
           <input
@@ -542,7 +544,8 @@ export default function RuleDetail({
           <input
             type="text"
             value={proj.id}
-            onChange={(e) => patch({ id: e.target.value })}
+            readOnly
+            title="Internal rule ID. Rename the label instead."
           />
           <label>Label</label>
           <input

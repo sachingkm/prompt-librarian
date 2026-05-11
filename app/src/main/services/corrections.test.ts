@@ -81,6 +81,35 @@ describe('buildCorrection', () => {
     expect(c!.rawTextHash).toMatch(/^[a-f0-9]{64}$/)
   })
 
+  it('does not store the complete raw body even for short prompts', () => {
+    const short = 'Short prompt body with private specifics.'
+    const c = buildCorrection({
+      rawText: short,
+      classifierId: 'deterministic-v1',
+      provider: 'deterministic',
+      suggested: baseSuggested,
+      accepted: { ...baseSuggested, title: 'Edited' }
+    })
+    expect(c).not.toBeNull()
+    expect(c!.rawTextPreview).not.toBe(short)
+    expect(c!.rawTextPreview).toMatch(/\.\.\.$/)
+    expect(short.startsWith(c!.rawTextPreview.replace(/\.\.\.$/, ''))).toBe(true)
+  })
+
+  it('truncates previews on a word boundary when practical', () => {
+    const raw = 'Portfolio review workflow should summarize holdings clearly.'
+    const c = buildCorrection({
+      rawText: raw,
+      classifierId: 'deterministic-v1',
+      provider: 'deterministic',
+      suggested: baseSuggested,
+      accepted: { ...baseSuggested, title: 'Edited' }
+    })
+    expect(c).not.toBeNull()
+    expect(c!.rawTextPreview).toMatch(/\.\.\.$/)
+    expect(c!.rawTextPreview).not.toMatch(/[a-z0-9]\\.\\.\\.$/i)
+  })
+
   it('considers tag set equality regardless of order/case', () => {
     const c = buildCorrection({
       rawText: 'hello',
