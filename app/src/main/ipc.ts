@@ -214,6 +214,14 @@ export function registerIpcHandlers(): void {
     }
   )
 
+  ipcMain.handle(IPC.settingsGetGeminiDisclosureAck, async () =>
+    settings.getGeminiDisclosureAck()
+  )
+
+  ipcMain.handle(IPC.settingsSetGeminiDisclosureAck, async (_evt, v: boolean) => {
+    await settings.setGeminiDisclosureAck(v === true)
+  })
+
   // ----- Settings: Gemini API key -------------------------------------
 
   ipcMain.handle(IPC.settingsHasGeminiApiKey, async () => {

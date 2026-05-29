@@ -69,18 +69,22 @@ export default function PromptIntake({ onClose, onSaved }: Props): JSX.Element {
   const geminiAcknowledgedRef = useRef(false)
   const textareaRef = useRef<HTMLTextAreaElement | null>(null)
 
-  // Boot: fetch AI status, current rules, current folders.
+  // Boot: fetch AI status, current rules, current folders, and the
+  // persisted Gemini disclosure acknowledgment. The disclosure is shown
+  // once ever (not once per modal open), so we seed the ref from settings.
   useEffect(() => {
     void (async () => {
       try {
-        const [status, rules, folderList] = await Promise.all([
+        const [status, rules, folderList, ack] = await Promise.all([
           window.api.getAiStatus(),
           window.api.getRules(),
-          window.api.listFolders().catch(() => [] as string[])
+          window.api.listFolders().catch(() => [] as string[]),
+          window.api.getGeminiDisclosureAck().catch(() => false)
         ])
         setAiStatus(status)
         setRulesPayload(rules)
         setFolders(folderList)
+        geminiAcknowledgedRef.current = ack
       } catch (err) {
         setError((err as Error).message)
       }
@@ -222,6 +226,8 @@ export default function PromptIntake({ onClose, onSaved }: Props): JSX.Element {
 
   const acceptGemini = useCallback((): void => {
     geminiAcknowledgedRef.current = true
+    // Persist so the disclosure never shows again on this machine.
+    void window.api.setGeminiDisclosureAck(true)
     setConfirmGemini({ open: false })
     if (pendingGeminiActionRef.current === 'classify') {
       void runGeminiClassifyToReview()
@@ -384,7 +390,11 @@ export default function PromptIntake({ onClose, onSaved }: Props): JSX.Element {
               ref={textareaRef}
               value={rawText}
               onChange={(e) => setRawText(e.target.value)}
-              placeholder="Paste raw prompt text. The deterministic classifier runs locally with no API call."
+              placeholder={
+                aiStatus?.provider === 'gemini'
+                  ? 'Paste raw prompt text. Classify sends it to Gemini (you will be asked to confirm the first time).'
+                  : 'Paste raw prompt text. The deterministic classifier runs locally with no API call.'
+              }
               rows={14}
               disabled={busy}
               className="intake-textarea"

@@ -1497,3 +1497,18 @@ body,
 .intake-dupe-list code {
   font-size: 11.5px;
 }
+
+.intake-folder-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.intake-folder-hint {
+  font-size: 11.5px;
+  margin: 0;
+}
+
+.intake-folder-hint code {
+  font-size: 11px;
+}

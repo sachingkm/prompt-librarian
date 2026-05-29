@@ -62,6 +62,10 @@ const api: PromptLibrarianApi = {
     ipcRenderer.invoke(IPC.settingsGetClassifierProvider) as Promise<ClassifierProvider>,
   setClassifierProvider: (p: ClassifierProvider | 'auto') =>
     ipcRenderer.invoke(IPC.settingsSetClassifierProvider, p) as Promise<void>,
+  getGeminiDisclosureAck: () =>
+    ipcRenderer.invoke(IPC.settingsGetGeminiDisclosureAck) as Promise<boolean>,
+  setGeminiDisclosureAck: (v: boolean) =>
+    ipcRenderer.invoke(IPC.settingsSetGeminiDisclosureAck, v) as Promise<void>,
   hasGeminiApiKey: () =>
     ipcRenderer.invoke(IPC.settingsHasGeminiApiKey) as Promise<{
       has: boolean

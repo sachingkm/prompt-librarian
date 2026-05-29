@@ -42,6 +42,8 @@ export const IPC = {
   learningOpenFolder: 'learning:openFolder',
   settingsGetClassifierProvider: 'settings:getClassifierProvider',
   settingsSetClassifierProvider: 'settings:setClassifierProvider',
+  settingsGetGeminiDisclosureAck: 'settings:getGeminiDisclosureAck',
+  settingsSetGeminiDisclosureAck: 'settings:setGeminiDisclosureAck',
   settingsHasGeminiApiKey: 'settings:hasGeminiApiKey',
   settingsSetGeminiApiKey: 'settings:setGeminiApiKey',
   settingsClearGeminiApiKey: 'settings:clearGeminiApiKey'
@@ -228,6 +230,9 @@ export interface PromptLibrarianApi {
   // applies (Gemini if key, deterministic otherwise).
   getClassifierProvider(): Promise<ClassifierProvider>
   setClassifierProvider(p: ClassifierProvider | 'auto'): Promise<void>
+  // Phase 4B: one-time Gemini disclosure acknowledgment, persisted.
+  getGeminiDisclosureAck(): Promise<boolean>
+  setGeminiDisclosureAck(v: boolean): Promise<void>
   hasGeminiApiKey(): Promise<{ has: boolean; source: 'env' | 'stored' | 'none' }>
   setGeminiApiKey(key: string): Promise<SecretSetResponse>
   clearGeminiApiKey(): Promise<{ ok: boolean }>

@@ -13,6 +13,9 @@ interface SettingsShape {
   manualClassifierProvider?: ClassifierProvider | null
   useCorrectionsAsExamples?: boolean
   suggestRuleAdditions?: boolean
+  // True once the user has acknowledged the one-time Gemini disclosure.
+  // Persisted so the disclosure is shown once ever, not once per modal open.
+  geminiDisclosureAck?: boolean
 }
 
 const SETTINGS_FILENAME = 'settings.json'
@@ -104,5 +107,16 @@ export async function getSuggestRuleAdditions(): Promise<boolean> {
 export async function setSuggestRuleAdditions(v: boolean): Promise<void> {
   const s = await readSettings()
   s.suggestRuleAdditions = v
+  await writeSettings(s)
+}
+
+export async function getGeminiDisclosureAck(): Promise<boolean> {
+  const s = await readSettings()
+  return s.geminiDisclosureAck === true // default OFF (show once)
+}
+
+export async function setGeminiDisclosureAck(v: boolean): Promise<void> {
+  const s = await readSettings()
+  s.geminiDisclosureAck = v
   await writeSettings(s)
 }

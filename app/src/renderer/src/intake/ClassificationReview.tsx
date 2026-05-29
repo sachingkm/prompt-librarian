@@ -91,6 +91,12 @@ export default function ClassificationReview({
     )
   })()
 
+  // Folder affordance: the field is free text, so the user can type a
+  // brand-new folder path. It does not exist on disk until save creates
+  // it (savePrompt does a recursive mkdir). Surface that explicitly.
+  const folderValue = classification.recommendedFolder.trim()
+  const folderWillBeCreated = folderValue.length > 0 && !folders.includes(folderValue)
+
   const dupes = duplicates ?? []
   const hasExactDupe = dupes.some((d) => d.matchType === 'exact')
 
@@ -256,17 +262,29 @@ export default function ClassificationReview({
           </select>
 
           <label>Folder</label>
-          <input
-            type="text"
-            value={classification.recommendedFolder}
-            onChange={(e) => patch('recommendedFolder', e.target.value)}
-            list="intake-folder-list"
-          />
-          <datalist id="intake-folder-list">
-            {ruleFolders.map((f) => (
-              <option key={f} value={f} />
-            ))}
-          </datalist>
+          <div className="intake-folder-field">
+            <input
+              type="text"
+              value={classification.recommendedFolder}
+              onChange={(e) => patch('recommendedFolder', e.target.value)}
+              list="intake-folder-list"
+              placeholder="Pick an existing folder or type a new path to create it"
+            />
+            <datalist id="intake-folder-list">
+              {ruleFolders.map((f) => (
+                <option key={f} value={f} />
+              ))}
+            </datalist>
+            {folderWillBeCreated ? (
+              <div className="onboarding-info intake-folder-hint">
+                New folder - <code>{folderValue}</code> will be created on save.
+              </div>
+            ) : (
+              <div className="dim intake-folder-hint">
+                Type a new path (e.g. <code>03-Job Search</code>) to create a folder on save.
+              </div>
+            )}
+          </div>
 
           <label>Filename</label>
           <input
