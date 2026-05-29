@@ -18,6 +18,7 @@ import * as rules from './services/rules/rulesService'
 import * as secrets from './services/secrets'
 import * as corrections from './services/corrections'
 import * as proposals from './services/proposals'
+import * as dedup from './services/dedup'
 import { validateClassifierRules } from '../shared/classifierRules'
 import { applyProposalToRules } from './services/proposals'
 
@@ -96,6 +97,15 @@ export function registerIpcHandlers(): void {
   })
 
   ipcMain.handle(IPC.classifierGetAiStatus, async () => classifier.getAiStatus())
+
+  // ----- Duplicate detection (Phase 4B) -------------------------------
+
+  ipcMain.handle(IPC.dedupCheck, async (_evt, rawText: string) => {
+    // Local-only: scans the library and matches by normalized body. No
+    // network involved. Returns [] when no root or empty input.
+    if (!(await settings.getRootPath())) return []
+    return dedup.checkDuplicate(rawText)
+  })
 
   // ----- Rules --------------------------------------------------------
 

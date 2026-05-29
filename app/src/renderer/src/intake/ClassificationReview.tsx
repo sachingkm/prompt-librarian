@@ -9,6 +9,7 @@ import type {
   RulesPayload,
   SaveResult
 } from '../../../shared/ipc'
+import type { DuplicateMatch } from '../../../shared/dedup'
 import type {
   ClassificationResult,
   ConfidenceTier,
@@ -26,6 +27,7 @@ interface Props {
   // Phase 4B
   fallback?: ClassifyFallbackMarker | null
   deterministicSnapshot?: ClassificationResult | null
+  duplicates?: DuplicateMatch[]
   onUpdate: (next: ClassificationResult) => void
   onImproveWithGemini: (() => void) | null
   onBack: () => void
@@ -55,6 +57,7 @@ export default function ClassificationReview({
   error,
   fallback,
   deterministicSnapshot,
+  duplicates,
   onUpdate,
   onImproveWithGemini,
   onBack,
@@ -87,6 +90,9 @@ export default function ClassificationReview({
       (c) => c.label.trim().toLowerCase() === norm
     )
   })()
+
+  const dupes = duplicates ?? []
+  const hasExactDupe = dupes.some((d) => d.matchType === 'exact')
 
   function patch<K extends keyof ClassificationResult>(
     key: K,
@@ -130,6 +136,31 @@ export default function ClassificationReview({
 
   return (
     <div className="intake-review">
+      {dupes.length > 0 && (
+        <section className="modal-section">
+          <div className="onboarding-error intake-dupe-warning">
+            <strong>
+              {hasExactDupe
+                ? 'You already saved this prompt.'
+                : 'This looks very similar to a prompt you already saved.'}
+            </strong>
+            <ul className="intake-dupe-list">
+              {dupes.slice(0, 5).map((d) => (
+                <li key={d.relPath}>
+                  <code>{d.relPath}</code>{' '}
+                  <span className="dim">
+                    ({d.matchType === 'exact' ? 'exact' : `near, ${Math.round(d.similarity * 100)}%`})
+                  </span>
+                </li>
+              ))}
+            </ul>
+            <div className="dim">
+              Saving anyway will create a separate copy. This is fine if you meant to.
+            </div>
+          </div>
+        </section>
+      )}
+
       {fallback && (
         <section className="modal-section">
           <div className="onboarding-info">
@@ -362,7 +393,7 @@ export default function ClassificationReview({
               onClick={() => attemptSave('fail')}
               disabled={saveBusy || busy}
             >
-              {saveBusy ? 'Saving...' : 'Save'}
+              {saveBusy ? 'Saving...' : dupes.length > 0 ? 'Save anyway' : 'Save'}
             </button>
           )}
         </div>

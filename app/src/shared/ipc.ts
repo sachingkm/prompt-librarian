@@ -5,6 +5,7 @@ import type { ClassifierProvider, ClassificationResult, ClassifierError, Classif
 import type { ClassifierRules, ClassifierRulesValidation } from './classifierRules'
 import type { Correction, CorrectionMetadata } from './correction'
 import type { RuleProposal } from './proposal'
+import type { DuplicateMatch } from './dedup'
 
 export const IPC = {
   settingsGetRootPath: 'settings:getRootPath',
@@ -19,6 +20,7 @@ export const IPC = {
   promptArchive: 'prompt:archive',
   classifierClassify: 'classifier:classify',
   classifierGetAiStatus: 'classifier:getAiStatus',
+  dedupCheck: 'dedup:check',
   rulesGet: 'rules:get',
   rulesGetPath: 'rules:getPath',
   rulesOpenInEditor: 'rules:openInEditor',
@@ -210,6 +212,8 @@ export interface PromptLibrarianApi {
   movePrompt(currentRelPath: string, newFolder: string): Promise<MoveResult>
   archivePrompt(currentRelPath: string): Promise<MoveResult>
   classify(req: ClassifyRequest): Promise<ClassifyResponse>
+  // Phase 4B: local, offline duplicate detection against the saved library.
+  checkDuplicate(rawText: string): Promise<DuplicateMatch[]>
   getAiStatus(): Promise<AiStatus>
   getRules(): Promise<RulesPayload>
   getRulesPath(): Promise<string | null>

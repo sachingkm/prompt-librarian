@@ -25,6 +25,7 @@ import {
 } from '../shared/ipc'
 import type { Correction } from '../shared/correction'
 import type { RuleProposal } from '../shared/proposal'
+import type { DuplicateMatch } from '../shared/dedup'
 
 const api: PromptLibrarianApi = {
   getRootPath: () => ipcRenderer.invoke(IPC.settingsGetRootPath) as Promise<string | null>,
@@ -44,6 +45,8 @@ const api: PromptLibrarianApi = {
     ipcRenderer.invoke(IPC.promptArchive, currentRelPath) as Promise<MoveResult>,
   classify: (req: ClassifyRequest) =>
     ipcRenderer.invoke(IPC.classifierClassify, req) as Promise<ClassifyResponse>,
+  checkDuplicate: (rawText: string) =>
+    ipcRenderer.invoke(IPC.dedupCheck, rawText) as Promise<DuplicateMatch[]>,
   getAiStatus: () => ipcRenderer.invoke(IPC.classifierGetAiStatus) as Promise<AiStatus>,
   getRules: () => ipcRenderer.invoke(IPC.rulesGet) as Promise<RulesPayload>,
   getRulesPath: () => ipcRenderer.invoke(IPC.rulesGetPath) as Promise<string | null>,

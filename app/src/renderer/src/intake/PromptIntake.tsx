@@ -18,6 +18,7 @@ import type {
   Scope
 } from '../../../shared/classifier'
 import type { CorrectionMetadata } from '../../../shared/correction'
+import type { DuplicateMatch } from '../../../shared/dedup'
 import { GEMINI_DISCLOSURE } from '../../../shared/geminiDisclosure'
 import ClassificationReview from './ClassificationReview'
 
@@ -59,6 +60,9 @@ export default function PromptIntake({ onClose, onSaved }: Props): JSX.Element {
   const [deterministicSnapshot, setDeterministicSnapshot] = useState<ClassificationResult | null>(
     null
   )
+  // Phase 4B: local duplicate matches for the pasted body. Populated after
+  // a successful classify; surfaced as a non-blocking warning in review.
+  const [duplicates, setDuplicates] = useState<DuplicateMatch[]>([])
   const [confirmGemini, setConfirmGemini] = useState<ConfirmGeminiState>({
     open: false
   })
@@ -92,6 +96,17 @@ export default function PromptIntake({ onClose, onSaved }: Props): JSX.Element {
     [aiStatus]
   )
 
+  // Best-effort local duplicate check. Never blocks or throws into the
+  // classify flow; on failure we just show no warning.
+  const refreshDuplicates = useCallback(async (): Promise<void> => {
+    try {
+      const matches = await window.api.checkDuplicate(rawText)
+      setDuplicates(matches)
+    } catch {
+      setDuplicates([])
+    }
+  }, [rawText])
+
   // Run a deterministic classify and advance to review.
   const runDeterministicClassify = useCallback(async (): Promise<void> => {
     setBusy(true)
@@ -109,13 +124,14 @@ export default function PromptIntake({ onClose, onSaved }: Props): JSX.Element {
       setClassification(resp.result)
       setSuggestedBaseline(resp.result)
       setDeterministicSnapshot(resp.result)
+      void refreshDuplicates()
       setStage('review')
     } catch (err) {
       setError((err as Error).message)
     } finally {
       setBusy(false)
     }
-  }, [rawText])
+  }, [rawText, refreshDuplicates])
 
   // Run a Gemini classify (router will run deterministic internally for the
   // hint) and advance to review. If Gemini fails, the response still has
@@ -137,13 +153,14 @@ export default function PromptIntake({ onClose, onSaved }: Props): JSX.Element {
       if (resp.fallback) setFallback(resp.fallback)
       setClassification(resp.result)
       setSuggestedBaseline(resp.result)
+      void refreshDuplicates()
       setStage('review')
     } catch (err) {
       setError((err as Error).message)
     } finally {
       setBusy(false)
     }
-  }, [rawText])
+  }, [rawText, refreshDuplicates])
 
   // "Improve" path used from the review stage (deterministic already ran).
   const runGeminiImprove = useCallback(async (): Promise<void> => {
@@ -408,6 +425,7 @@ export default function PromptIntake({ onClose, onSaved }: Props): JSX.Element {
             error={error}
             fallback={fallback}
             deterministicSnapshot={deterministicSnapshot}
+            duplicates={duplicates}
             onUpdate={(next) => setClassification(next)}
             onImproveWithGemini={aiAvailable ? handleImproveWithGemini : null}
             onBack={() => {
