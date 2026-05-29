@@ -86,6 +86,13 @@ export function registerIpcHandlers(): void {
     return library.movePrompt(currentRelPath, newFolder)
   })
 
+  ipcMain.handle(
+    IPC.promptUpdate,
+    async (_evt, originalRelPath: string, draft: PromptDraft, opts?: SaveOptions) => {
+      return library.updatePrompt(originalRelPath, draft, opts)
+    }
+  )
+
   ipcMain.handle(IPC.promptArchive, async (_evt, currentRelPath: string) => {
     return library.archivePrompt(currentRelPath)
   })

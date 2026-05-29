@@ -256,6 +256,94 @@ export async function savePrompt(
   }
 }
 
+// Edit an existing prompt. Unlike savePrompt (which always creates a new
+// file), this updates a known prompt in place, and relocates it when the
+// edited folder/filename change its path.
+//
+// - Same path (folder + filename unchanged): overwrite in place. This is an
+//   intentional edit of the same prompt, so no collision is raised.
+// - New path: write the new file, then remove the original. A DIFFERENT
+//   existing file at the new path is a guarded collision (fail unless the
+//   caller passes strategy 'overwrite', or 'rename' with a fresh filename).
+//
+// Write-then-delete order means a failed delete leaves a duplicate rather
+// than losing data. updated_at is the caller's responsibility (the renderer
+// sets it), matching savePrompt.
+export async function updatePrompt(
+  originalRelPath: string,
+  draft: PromptDraft,
+  opts: SaveOptions = {}
+): Promise<SaveResult> {
+  const strategy = opts.strategy ?? 'fail'
+  const root = await requireRoot()
+
+  let oldAbs: string
+  try {
+    oldAbs = safeResolveWithin(root, originalRelPath)
+  } catch (err) {
+    return { ok: false, error: (err as Error).message }
+  }
+  const oldStat = await fs.stat(oldAbs).catch(() => null)
+  if (!oldStat || !oldStat.isFile()) {
+    return { ok: false, error: `Original prompt not found: ${originalRelPath}` }
+  }
+
+  let filename = draft.filename
+  if (strategy === 'rename') {
+    if (!opts.newFilename) {
+      return { ok: false, error: "strategy 'rename' requires opts.newFilename" }
+    }
+    filename = opts.newFilename
+  }
+  try {
+    assertValidFilename(filename)
+  } catch (err) {
+    return { ok: false, error: (err as Error).message }
+  }
+
+  const folderRel = draft.folder.replace(/^[/\\]+|[/\\]+$/g, '')
+  let folderAbs: string
+  let newAbs: string
+  try {
+    folderAbs = safeResolveWithin(root, folderRel)
+    newAbs = safeResolveWithin(root, join(folderRel, filename))
+  } catch (err) {
+    return { ok: false, error: (err as Error).message }
+  }
+
+  const relocating = newAbs !== oldAbs
+
+  await fs.mkdir(folderAbs, { recursive: true })
+
+  if (relocating) {
+    const dstExists = await fs.stat(newAbs).catch(() => null)
+    if (dstExists && dstExists.isFile() && strategy !== 'overwrite') {
+      return {
+        ok: false,
+        collision: true,
+        path: newAbs,
+        relPath: toRelPosix(root, newAbs),
+        error:
+          strategy === 'rename'
+            ? `Renamed target already exists: ${filename}`
+            : 'A different prompt already exists at the new location.'
+      }
+    }
+  }
+
+  try {
+    const contents = stringifyPrompt({ ...draft, filename })
+    await fs.writeFile(newAbs, contents, 'utf8')
+    if (relocating) {
+      // Remove the original only after the new file is safely written.
+      await fs.rm(oldAbs, { force: true })
+    }
+    return { ok: true, path: newAbs, relPath: toRelPosix(root, newAbs) }
+  } catch (err) {
+    return { ok: false, error: (err as Error).message }
+  }
+}
+
 export async function movePrompt(
   currentRelPath: string,
   newFolder: string

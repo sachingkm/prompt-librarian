@@ -1512,3 +1512,73 @@ body,
 .intake-folder-hint code {
   font-size: 11px;
 }
+
+.detail-head-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+/* Full-window prompt edit modal. Wide panel + tall body so long prompts
+   (many pages) have real editing room. */
+.prompt-edit-panel {
+  max-width: 1100px;
+  width: 100%;
+  max-height: calc(100vh - 96px);
+}
+
+.prompt-edit-body {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+  padding: 0 16px;
+}
+
+.prompt-edit-body-section {
+  display: flex;
+  flex-direction: column;
+}
+
+.prompt-edit-meta-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+/* The HTML hidden attribute is overridden by .form-grid's explicit
+   display: grid, so collapse needs this explicit rule to take effect. */
+.form-grid[hidden] {
+  display: none;
+}
+
+.prompt-edit-textarea {
+  width: 100%;
+  min-height: 45vh;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 10px;
+  font-family: var(--mono);
+  font-size: 13px;
+  line-height: 1.5;
+  resize: vertical;
+}
+
+/* When metadata is collapsed, let the body fill the panel. */
+.prompt-edit-textarea--max {
+  min-height: 72vh;
+}
+
+.prompt-edit-footer {
+  border-top: 1px solid var(--border);
+}
+
+.prompt-edit-panel .modal-head code.detail-path {
+  display: block;
+  margin-top: 4px;
+  font-size: 11px;
+}

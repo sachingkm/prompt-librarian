@@ -168,7 +168,15 @@ export default function LibraryBrowser(): JSX.Element {
         )}
       </main>
 
-      {view.kind !== 'home' && <PromptDetail prompt={selectedPrompt} />}
+      {view.kind !== 'home' && (
+        <PromptDetail
+          prompt={selectedPrompt}
+          onSaved={(newRelPath) => {
+            // Rescan, then reselect the prompt at its (possibly new) path.
+            void refresh('manual').then(() => setSelectedRelPath(newRelPath))
+          }}
+        />
+      )}
     </div>
   )
 }

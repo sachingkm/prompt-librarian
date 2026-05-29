@@ -16,6 +16,7 @@ export const IPC = {
   libraryScan: 'library:scan',
   libraryListFolders: 'library:listFolders',
   promptSave: 'prompt:save',
+  promptUpdate: 'prompt:update',
   promptMove: 'prompt:move',
   promptArchive: 'prompt:archive',
   classifierClassify: 'classifier:classify',
@@ -211,6 +212,8 @@ export interface PromptLibrarianApi {
   scanLibrary(): Promise<Prompt[]>
   listFolders(): Promise<string[]>
   savePrompt(draft: PromptDraft, opts?: SaveOptions): Promise<SaveResult>
+  // Phase 5: edit an existing prompt, relocating it if folder/filename change.
+  updatePrompt(originalRelPath: string, draft: PromptDraft, opts?: SaveOptions): Promise<SaveResult>
   movePrompt(currentRelPath: string, newFolder: string): Promise<MoveResult>
   archivePrompt(currentRelPath: string): Promise<MoveResult>
   classify(req: ClassifyRequest): Promise<ClassifyResponse>

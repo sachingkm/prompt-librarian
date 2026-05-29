@@ -39,6 +39,8 @@ const api: PromptLibrarianApi = {
   listFolders: () => ipcRenderer.invoke(IPC.libraryListFolders) as Promise<string[]>,
   savePrompt: (draft: PromptDraft, opts?: SaveOptions) =>
     ipcRenderer.invoke(IPC.promptSave, draft, opts) as Promise<SaveResult>,
+  updatePrompt: (originalRelPath: string, draft: PromptDraft, opts?: SaveOptions) =>
+    ipcRenderer.invoke(IPC.promptUpdate, originalRelPath, draft, opts) as Promise<SaveResult>,
   movePrompt: (currentRelPath, newFolder) =>
     ipcRenderer.invoke(IPC.promptMove, currentRelPath, newFolder) as Promise<MoveResult>,
   archivePrompt: (currentRelPath) =>
